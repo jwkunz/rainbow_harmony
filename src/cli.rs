@@ -287,11 +287,11 @@ Synthesis:
   --gain <gain>                        Output gain before normalization, default 1.0
   --harmonics <count>                  Harmonic count including the fundamental, default 33
   --phase-mod-rate <hz>                Phase modulation rate in Hz, default 1.0
-  --phase-mod-depth <radians>          Phase modulation depth in radians, default 3.1415927
+  --phase-mod-depth <radians>          Phase modulation depth in radians, default 0.0
   --amp-tremolo-rate <hz>              Amplitude tremolo rate in Hz, default 1.0
   --amp-tremolo-depth <depth>          Amplitude tremolo depth from 0.0 to 1.0, default 0.1
-  --vibrato-rate <hz>                  Vibrato rate in Hz, default 10.0
-  --vibrato-depth-cents <cents>        Vibrato depth in cents, default 3.0
+  --vibrato-rate <hz>                  Vibrato rate in Hz, default 2.0
+  --vibrato-depth-cents <cents>        Vibrato depth in cents, default 0.75
   --seed <integer>                     Seed for reproducible phase variation, default 0
 
 Notes:

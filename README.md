@@ -27,10 +27,10 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - additive synthesis using a configurable harmonic count, defaulting to 33 partials
 - exponentially decreasing harmonic intensity
 - fresh harmonic phase variation on each playback
-- configurable phase modulation rate and depth
+- optional phase modulation with configurable rate and depth, default depth `0.0`
 - overtones independently choose random positive or negative phase sweep directions
 - configurable amplitude tremolo rate and depth
-- default vibrato at 10 Hz with 3 cents of depth
+- default vibrato at 2 Hz with 0.75 cents of depth
 - reproducible seeded phase variation
 - final waveform peak-normalized to `1.0`
 
@@ -123,11 +123,11 @@ Duplicate notes are allowed.
 - `--gain <gain>` sets output gain before normalization, default `1.0`
 - `--harmonics <count>` sets the number of harmonics including the fundamental, default `33`
 - `--phase-mod-rate <hz>` sets phase modulation rate, default `1.0`
-- `--phase-mod-depth <radians>` sets phase modulation depth, default `pi`
+- `--phase-mod-depth <radians>` sets phase modulation depth, default `0.0`
 - `--amp-tremolo-rate <hz>` sets amplitude tremolo rate, default `1.0`
 - `--amp-tremolo-depth <depth>` sets amplitude tremolo depth from `0.0` to `1.0`, default `0.1`
-- `--vibrato-rate <hz>` sets vibrato rate, default `10.0`
-- `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `3.0`
+- `--vibrato-rate <hz>` sets vibrato rate, default `2.0`
+- `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `0.75`
 - `--seed <integer>` sets a deterministic seed for reproducible phase variation
 
 Example:

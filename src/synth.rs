@@ -25,11 +25,11 @@ impl Default for SynthOptions {
             gain: 1.0,
             harmonics: 33,
             phase_mod_rate_hz: 1.0,
-            phase_mod_depth_radians: PI,
+            phase_mod_depth_radians: 0.0,
             amp_tremolo_rate_hz: 1.0,
             amp_tremolo_depth: 0.1,
-            vibrato_rate_hz: 10.0,
-            vibrato_depth_cents: 3.0,
+            vibrato_rate_hz: 2.0,
+            vibrato_depth_cents: 0.75,
             seed: 0,
         }
     }
