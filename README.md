@@ -4,9 +4,9 @@
 
 You give it:
 
-- a note or chord expression such as `A4` or `C4+E4+G4`
-- a duration in beats
-- an optional tempo in beats per minute
+- a note or chord expression such as `A4` or `C4+E4+G4` via `--notes`
+- either a duration in beats via `--beats` with optional `--bpm`
+- or an absolute duration via `--seconds`
 
 It generates the waveform in-process, adds a short fade-in and fade-out to reduce clicks, and blocks until playback finishes.
 
@@ -34,17 +34,19 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 ## Command Syntax
 
 ```bash
-rainbow_harmony <notes> <beats> [bpm]
+rainbow_harmony --notes <notes> --beats <beats> [--bpm <bpm>]
+rainbow_harmony --notes <notes> --seconds <seconds>
 ```
 
 Examples:
 
 ```bash
-rainbow_harmony A4 2
-rainbow_harmony c4 2
-rainbow_harmony Bb3 4
-rainbow_harmony C4+E4+G4 2
-rainbow_harmony A3+C#4+E4 4 90
+rainbow_harmony --notes A4 --beats 2
+rainbow_harmony --notes c4 --beats 2
+rainbow_harmony --notes Bb3 --beats 4
+rainbow_harmony --notes C4+E4+G4 --beats 2
+rainbow_harmony --notes A3+C#4+E4 --beats 4 --bpm 90
+rainbow_harmony --notes A4 --seconds 1.5
 ```
 
 Help:
@@ -98,18 +100,20 @@ Join notes with `+` to play them simultaneously.
 Examples:
 
 ```bash
-rainbow_harmony C4+E4 2
-rainbow_harmony C4+E4+G4 2
-rainbow_harmony C4+C4 1
+rainbow_harmony --notes C4+E4 --beats 2
+rainbow_harmony --notes C4+E4+G4 --beats 2
+rainbow_harmony --notes C4+C4 --beats 1
 ```
 
 Duplicate notes are allowed.
 
-## Beats And BPM
+## Duration
 
-- `beats` is required and must be a positive integer
-- `bpm` is optional and must be a positive integer
-- default BPM is `120`
+- `--notes` is required
+- use exactly one of `--beats` or `--seconds`
+- `--beats` must be a positive integer
+- `--seconds` must be a positive number
+- `--bpm` is optional, defaults to `120`, and may only be used with `--beats`
 
 Duration is computed from beats and BPM:
 
@@ -144,7 +148,7 @@ cargo build --release
 Run from the release binary:
 
 ```bash
-./target/release/rainbow_harmony A4 2
+./target/release/rainbow_harmony --notes A4 --beats 2
 ```
 
 ### Linux Notes
@@ -178,13 +182,13 @@ Expected usage after extracting a release:
 Linux/macOS:
 
 ```bash
-./rainbow_harmony C4+E4+G4 2
+./rainbow_harmony --notes C4+E4+G4 --beats 2
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\rainbow_harmony.exe C4+E4+G4 2
+.\rainbow_harmony.exe --notes C4+E4+G4 --beats 2
 ```
 
 If you want the command available globally, move the binary into a directory that is already on your `PATH`, or add the extraction directory to your `PATH`.
@@ -194,19 +198,25 @@ If you want the command available globally, move the binary into a directory tha
 Play middle C for two beats at the default tempo:
 
 ```bash
-rainbow_harmony C4 2
+rainbow_harmony --notes C4 --beats 2
 ```
 
 Play A major as a chord for three beats:
 
 ```bash
-rainbow_harmony A3+C#4+E4 3
+rainbow_harmony --notes A3+C#4+E4 --beats 3
 ```
 
 Play a slower chord at 72 BPM:
 
 ```bash
-rainbow_harmony D4+F#4+A4 4 72
+rainbow_harmony --notes D4+F#4+A4 --beats 4 --bpm 72
+```
+
+Play for an absolute duration in seconds:
+
+```bash
+rainbow_harmony --notes A4 --seconds 1.25
 ```
 
 ## Error Behavior
@@ -259,7 +269,7 @@ cargo fmt
 Run the CLI directly during development:
 
 ```bash
-cargo run -- C4+E4+G4 2
+cargo run -- --notes C4+E4+G4 --beats 2
 ```
 
 ## Roadmap
@@ -270,4 +280,5 @@ Planned follow-up work:
 - automated Windows, macOS, and Linux release builds
 - packaged downloadable release archives
 - additional test coverage around CLI error output
+- additional synthesis and export flags in the expanded flag-based CLI
 - optional device selection and waveform controls

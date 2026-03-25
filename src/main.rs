@@ -25,7 +25,7 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         Ok(ParseOutcome::Run(command)) => {
-            play_waveform_blocking(&command.chord, command.duration())
+            play_waveform_blocking(&command.chord, command.duration)
                 .map_err(|error| error.to_string())
         }
         Err(error) => Err(format!("{error}\n\n{}", usage(&program_name))),
