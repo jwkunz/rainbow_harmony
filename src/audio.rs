@@ -5,7 +5,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, SampleFormat, SizedSample, StreamConfig};
 
 use crate::error::RainbowError;
-use crate::synth::render_waveform;
+use crate::synth::{SynthOptions, render_waveform};
 
 struct PlaybackState {
     samples: Vec<f32>,
@@ -16,6 +16,7 @@ struct PlaybackState {
 pub fn play_waveform_blocking(
     chord: &crate::chord::Chord,
     duration: Duration,
+    synth_options: SynthOptions,
 ) -> Result<(), RainbowError> {
     let host = cpal::default_host();
     let device = host
@@ -28,7 +29,7 @@ pub fn play_waveform_blocking(
 
     let sample_rate = supported_config.sample_rate().0;
     let config: StreamConfig = supported_config.config();
-    let samples = render_waveform(chord, duration, sample_rate);
+    let samples = render_waveform(chord, duration, sample_rate, synth_options);
     let playback_state = Arc::new((
         Mutex::new(PlaybackState {
             samples,

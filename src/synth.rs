@@ -3,15 +3,40 @@ use std::time::Duration;
 
 use crate::chord::Chord;
 
-const HARMONIC_COUNT: u32 = 33;
 const FADE_TIME_SECONDS: f32 = 0.01;
 const PHASE_GOLDEN_RATIO: f32 = 2.399_963_1;
-const PHASE_TREMOLO_HZ: f32 = 1.0;
-const PHASE_TREMOLO_DEPTH_RADIANS: f32 = PI;
-const AMPLITUDE_TREMOLO_HZ: f32 = 1.0;
-const AMPLITUDE_TREMOLO_DEPTH: f32 = 0.1;
 
-pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> Vec<f32> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SynthOptions {
+    pub gain: f32,
+    pub harmonics: u32,
+    pub phase_tremolo_rate_hz: f32,
+    pub phase_tremolo_depth_radians: f32,
+    pub amp_tremolo_rate_hz: f32,
+    pub amp_tremolo_depth: f32,
+    pub seed: u64,
+}
+
+impl Default for SynthOptions {
+    fn default() -> Self {
+        Self {
+            gain: 1.0,
+            harmonics: 33,
+            phase_tremolo_rate_hz: 1.0,
+            phase_tremolo_depth_radians: PI,
+            amp_tremolo_rate_hz: 1.0,
+            amp_tremolo_depth: 0.1,
+            seed: 0,
+        }
+    }
+}
+
+pub fn render_waveform(
+    chord: &Chord,
+    duration: Duration,
+    sample_rate: u32,
+    options: SynthOptions,
+) -> Vec<f32> {
     let frame_count = (duration.as_secs_f64() * sample_rate as f64).ceil() as usize;
     if frame_count == 0 {
         return Vec::new();
@@ -21,9 +46,9 @@ pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> V
 
     for note in chord.notes() {
         let frequency = note.frequency_hz();
-        let note_seed = frequency.to_bits() ^ (frame_count as u32).wrapping_mul(0x9E37_79B9);
+        let note_seed = note_seed_for_playback(frequency, frame_count, options.seed);
 
-        for harmonic_index in 1..=HARMONIC_COUNT {
+        for harmonic_index in 1..=options.harmonics {
             let harmonic_frequency = frequency * harmonic_index as f32;
             let amplitude = (-0.6 * (harmonic_index - 1) as f32).exp();
             let phase = phase_for_harmonic(note_seed, harmonic_index);
@@ -32,12 +57,13 @@ pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> V
             for (sample_index, sample) in samples.iter_mut().enumerate() {
                 let time = sample_index as f32 / sample_rate as f32;
                 let tremolo_phase = phase_direction
-                    * PHASE_TREMOLO_DEPTH_RADIANS
-                    * (2.0 * PI * PHASE_TREMOLO_HZ * time).sin();
-                let amplitude_tremolo =
-                    1.0 + AMPLITUDE_TREMOLO_DEPTH * (2.0 * PI * AMPLITUDE_TREMOLO_HZ * time).sin();
+                    * options.phase_tremolo_depth_radians
+                    * (2.0 * PI * options.phase_tremolo_rate_hz * time).sin();
+                let amplitude_tremolo = 1.0
+                    + options.amp_tremolo_depth * (2.0 * PI * options.amp_tremolo_rate_hz * time).sin();
                 *sample +=
-                    amplitude
+                    options.gain
+                        * amplitude
                         * amplitude_tremolo
                         * (2.0 * PI * harmonic_frequency * time + phase + tremolo_phase).sin();
             }
@@ -48,6 +74,14 @@ pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> V
     normalize_peak(&mut samples);
 
     samples
+}
+
+fn note_seed_for_playback(frequency: f32, frame_count: usize, seed: u64) -> u32 {
+    let mixed = u64::from(frequency.to_bits())
+        ^ (frame_count as u64).wrapping_mul(0x9E37_79B9)
+        ^ seed.wrapping_mul(0xA24B_AED4_963E_E407);
+
+    (mixed ^ (mixed >> 32)) as u32
 }
 
 fn phase_for_harmonic(seed: u32, harmonic_index: u32) -> f32 {
@@ -107,19 +141,29 @@ mod tests {
 
     use crate::chord::Chord;
 
-    use super::render_waveform;
+    use super::{SynthOptions, render_waveform};
 
     #[test]
     fn renders_non_empty_waveform() {
         let chord = Chord::parse("A4").unwrap();
-        let samples = render_waveform(&chord, Duration::from_millis(100), 48_000);
+        let samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
         assert!(!samples.is_empty());
     }
 
     #[test]
     fn normalizes_peak_to_one() {
         let chord = Chord::parse("C4+E4+G4").unwrap();
-        let samples = render_waveform(&chord, Duration::from_millis(50), 48_000);
+        let samples = render_waveform(
+            &chord,
+            Duration::from_millis(50),
+            48_000,
+            SynthOptions::default(),
+        );
         let peak = samples
             .iter()
             .copied()
@@ -131,8 +175,35 @@ mod tests {
     #[test]
     fn fades_in_and_out() {
         let chord = Chord::parse("A4").unwrap();
-        let samples = render_waveform(&chord, Duration::from_millis(100), 48_000);
+        let samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
         assert!(samples.first().unwrap().abs() < 0.001);
         assert!(samples.last().unwrap().abs() < 0.001);
+    }
+
+    #[test]
+    fn seed_changes_waveform() {
+        let chord = Chord::parse("A4").unwrap();
+        let default_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
+        let seeded_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions {
+                seed: 7,
+                ..SynthOptions::default()
+            },
+        );
+
+        assert_ne!(default_samples, seeded_samples);
     }
 }

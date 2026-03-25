@@ -7,6 +7,7 @@ You give it:
 - a note or chord expression such as `A4` or `C4+E4+G4` via `--notes`
 - either a duration in beats via `--beats` with optional `--bpm`
 - or an absolute duration via `--seconds`
+- optional synthesis controls such as `--gain`, `--harmonics`, tremolo controls, and `--seed`
 
 It generates the waveform in-process, adds a short fade-in and fade-out to reduce clicks, and blocks until playback finishes.
 
@@ -23,19 +24,19 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - lowercase note input accepted and normalized
 - positive integer beats
 - optional positive integer BPM, defaulting to `120`
-- additive synthesis using the fundamental plus 32 harmonics
+- additive synthesis using a configurable harmonic count, defaulting to 33 partials
 - exponentially decreasing harmonic intensity
 - fresh harmonic phase variation on each playback
-- 1 Hz phase tremolo with a modulation depth of `+-pi`
+- configurable phase tremolo rate and depth
 - overtones independently choose random positive or negative phase sweep directions
-- 1 Hz amplitude tremolo with about 10% ripple
+- configurable amplitude tremolo rate and depth
+- reproducible seeded phase variation
 - final waveform peak-normalized to `1.0`
 
 ## Command Syntax
 
 ```bash
-rainbow_harmony --notes <notes> --beats <beats> [--bpm <bpm>]
-rainbow_harmony --notes <notes> --seconds <seconds>
+rainbow_harmony --notes <notes> (--beats <beats> [--bpm <bpm>] | --seconds <seconds>) [options]
 ```
 
 Examples:
@@ -47,6 +48,7 @@ rainbow_harmony --notes Bb3 --beats 4
 rainbow_harmony --notes C4+E4+G4 --beats 2
 rainbow_harmony --notes A3+C#4+E4 --beats 4 --bpm 90
 rainbow_harmony --notes A4 --seconds 1.5
+rainbow_harmony --notes A4 --seconds 2.0 --harmonics 12 --amp-tremolo-depth 0.2
 ```
 
 Help:
@@ -114,6 +116,32 @@ Duplicate notes are allowed.
 - `--beats` must be a positive integer
 - `--seconds` must be a positive number
 - `--bpm` is optional, defaults to `120`, and may only be used with `--beats`
+
+## Synthesis Flags
+
+- `--gain <gain>` sets output gain before normalization, default `1.0`
+- `--harmonics <count>` sets the number of harmonics including the fundamental, default `33`
+- `--phase-tremolo-rate <hz>` sets phase modulation rate, default `1.0`
+- `--phase-tremolo-depth <radians>` sets phase modulation depth, default `pi`
+- `--amp-tremolo-rate <hz>` sets amplitude tremolo rate, default `1.0`
+- `--amp-tremolo-depth <depth>` sets amplitude tremolo depth from `0.0` to `1.0`, default `0.1`
+- `--seed <integer>` sets a deterministic seed for reproducible phase variation
+
+Example:
+
+```bash
+rainbow_harmony \
+  --notes C4+E4+G4 \
+  --beats 4 \
+  --bpm 72 \
+  --gain 0.8 \
+  --harmonics 16 \
+  --phase-tremolo-rate 0.5 \
+  --phase-tremolo-depth 1.57 \
+  --amp-tremolo-rate 1.25 \
+  --amp-tremolo-depth 0.2 \
+  --seed 42
+```
 
 Duration is computed from beats and BPM:
 
@@ -241,12 +269,13 @@ Examples of invalid input:
 
 - uses the system default output audio device
 - generates audio samples in-process
-- renders the fundamental and the next 32 harmonics for each note
+- renders the configured harmonic count for each note
 - uses exponentially decreasing harmonic amplitudes
 - varies harmonic phase on each playback
-- modulates oscillator phase at 1 Hz with a depth of `+-pi`
+- modulates oscillator phase with configurable rate and depth
 - assigns each overtone its own per-playback positive or negative phase modulation direction
-- applies a 1 Hz amplitude modulation with roughly 10% depth
+- applies amplitude modulation with configurable rate and depth
+- supports deterministic seeded phase variation for repeatable results
 - applies a short fade-in and fade-out
 - normalizes the final mixed waveform to a peak amplitude of `1.0`
 
