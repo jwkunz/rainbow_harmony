@@ -26,6 +26,9 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - additive synthesis using the fundamental plus 32 harmonics
 - exponentially decreasing harmonic intensity
 - fresh harmonic phase variation on each playback
+- 1 Hz phase tremolo with a modulation depth of `+-pi`
+- overtones independently choose random positive or negative phase sweep directions
+- 1 Hz amplitude tremolo with about 10% ripple
 - final waveform peak-normalized to `1.0`
 
 ## Command Syntax
@@ -231,6 +234,9 @@ Examples of invalid input:
 - renders the fundamental and the next 32 harmonics for each note
 - uses exponentially decreasing harmonic amplitudes
 - varies harmonic phase on each playback
+- modulates oscillator phase at 1 Hz with a depth of `+-pi`
+- assigns each overtone its own per-playback positive or negative phase modulation direction
+- applies a 1 Hz amplitude modulation with roughly 10% depth
 - applies a short fade-in and fade-out
 - normalizes the final mixed waveform to a peak amplitude of `1.0`
 

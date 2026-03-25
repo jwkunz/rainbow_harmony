@@ -6,6 +6,10 @@ use crate::chord::Chord;
 const HARMONIC_COUNT: u32 = 33;
 const FADE_TIME_SECONDS: f32 = 0.01;
 const PHASE_GOLDEN_RATIO: f32 = 2.399_963_1;
+const PHASE_TREMOLO_HZ: f32 = 1.0;
+const PHASE_TREMOLO_DEPTH_RADIANS: f32 = PI;
+const AMPLITUDE_TREMOLO_HZ: f32 = 1.0;
+const AMPLITUDE_TREMOLO_DEPTH: f32 = 0.1;
 
 pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> Vec<f32> {
     let frame_count = (duration.as_secs_f64() * sample_rate as f64).ceil() as usize;
@@ -23,10 +27,19 @@ pub fn render_waveform(chord: &Chord, duration: Duration, sample_rate: u32) -> V
             let harmonic_frequency = frequency * harmonic_index as f32;
             let amplitude = (-0.6 * (harmonic_index - 1) as f32).exp();
             let phase = phase_for_harmonic(note_seed, harmonic_index);
+            let phase_direction = phase_direction_for_harmonic(note_seed, harmonic_index);
 
             for (sample_index, sample) in samples.iter_mut().enumerate() {
                 let time = sample_index as f32 / sample_rate as f32;
-                *sample += amplitude * (2.0 * PI * harmonic_frequency * time + phase).sin();
+                let tremolo_phase = phase_direction
+                    * PHASE_TREMOLO_DEPTH_RADIANS
+                    * (2.0 * PI * PHASE_TREMOLO_HZ * time).sin();
+                let amplitude_tremolo =
+                    1.0 + AMPLITUDE_TREMOLO_DEPTH * (2.0 * PI * AMPLITUDE_TREMOLO_HZ * time).sin();
+                *sample +=
+                    amplitude
+                        * amplitude_tremolo
+                        * (2.0 * PI * harmonic_frequency * time + phase + tremolo_phase).sin();
             }
         }
     }
@@ -43,6 +56,18 @@ fn phase_for_harmonic(seed: u32, harmonic_index: u32) -> f32 {
         .wrapping_add(harmonic_index.wrapping_mul(0xC2B2_AE35));
     let normalized = (mixed as f32 / u32::MAX as f32) * 2.0 * PI;
     normalized + harmonic_index as f32 * PHASE_GOLDEN_RATIO
+}
+
+fn phase_direction_for_harmonic(seed: u32, harmonic_index: u32) -> f32 {
+    if harmonic_index == 1 {
+        return 1.0;
+    }
+
+    let mixed = seed
+        .wrapping_mul(0x27D4_EB2D)
+        .wrapping_add(harmonic_index.wrapping_mul(0x1656_67B1));
+
+    if mixed & 1 == 0 { 1.0 } else { -1.0 }
 }
 
 fn apply_fade(samples: &mut [f32], sample_rate: u32) {
