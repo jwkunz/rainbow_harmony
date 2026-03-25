@@ -75,6 +75,11 @@ where
                 let value = flag_value(&remaining, &mut index, "--harmonics")?;
                 synth_options.harmonics = parse_positive_integer(value, "harmonics")?;
             }
+            "--harmonic-decay" => {
+                let value = flag_value(&remaining, &mut index, "--harmonic-decay")?;
+                synth_options.harmonic_decay =
+                    parse_non_negative_f32(value, "harmonic decay")?;
+            }
             "--phase-mod-rate" => {
                 let value = flag_value(&remaining, &mut index, "--phase-mod-rate")?;
                 synth_options.phase_mod_rate_hz =
@@ -296,6 +301,7 @@ Duration:
 Synthesis:
   --gain <gain>                        Output gain before normalization, default 1.0
   --harmonics <count>                  Harmonic count including the fundamental, default 33
+  --harmonic-decay <rate>             Exponential harmonic falloff rate, default 0.8
   --phase-mod-rate <hz>                Phase modulation rate in Hz, default 1000.0
   --phase-mod-depth <radians>          Phase modulation depth in radians, default 0.05
   --amp-tremolo-rate <hz>              Amplitude tremolo rate in Hz, default 3.0
@@ -392,6 +398,8 @@ mod tests {
             "0.8".to_string(),
             "--harmonics".to_string(),
             "12".to_string(),
+            "--harmonic-decay".to_string(),
+            "0.2".to_string(),
             "--phase-mod-rate".to_string(),
             "0.5".to_string(),
             "--phase-mod-depth".to_string(),
@@ -417,6 +425,7 @@ mod tests {
 
         assert_eq!(command.synth_options.gain, 0.8);
         assert_eq!(command.synth_options.harmonics, 12);
+        assert_eq!(command.synth_options.harmonic_decay, 0.2);
         assert_eq!(command.synth_options.phase_mod_rate_hz, 0.5);
         assert_eq!(command.synth_options.phase_mod_depth_radians, 1.57);
         assert_eq!(command.synth_options.amp_tremolo_rate_hz, 2.0);
@@ -543,5 +552,22 @@ mod tests {
         .to_string();
 
         assert!(error.contains("noise depth"));
+    }
+
+    #[test]
+    fn rejects_negative_harmonic_decay() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--seconds".to_string(),
+            "1.0".to_string(),
+            "--harmonic-decay".to_string(),
+            "-0.1".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("harmonic decay"));
     }
 }

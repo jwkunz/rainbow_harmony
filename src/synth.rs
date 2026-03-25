@@ -10,6 +10,7 @@ const PHASE_GOLDEN_RATIO: f32 = 2.399_963_1;
 pub struct SynthOptions {
     pub gain: f32,
     pub harmonics: u32,
+    pub harmonic_decay: f32,
     pub phase_mod_rate_hz: f32,
     pub phase_mod_depth_radians: f32,
     pub amp_tremolo_rate_hz: f32,
@@ -25,6 +26,7 @@ impl Default for SynthOptions {
         Self {
             gain: 1.0,
             harmonics: 33,
+            harmonic_decay: 0.8,
             phase_mod_rate_hz: 1000.0,
             phase_mod_depth_radians: 0.05,
             amp_tremolo_rate_hz: 3.0,
@@ -55,7 +57,7 @@ pub fn render_waveform(
         let note_seed = note_seed_for_playback(frequency, frame_count, options.seed);
 
         for harmonic_index in 1..=options.harmonics {
-            let amplitude = (-0.6 * (harmonic_index - 1) as f32).exp();
+            let amplitude = (-(options.harmonic_decay) * (harmonic_index - 1) as f32).exp();
             let phase = phase_for_harmonic(note_seed, harmonic_index);
             let phase_direction = phase_direction_for_harmonic(note_seed, harmonic_index);
 
@@ -280,5 +282,27 @@ mod tests {
         );
 
         assert_ne!(no_noise_samples, noise_samples);
+    }
+
+    #[test]
+    fn harmonic_decay_changes_waveform() {
+        let chord = Chord::parse("A4").unwrap();
+        let default_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
+        let slower_decay_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions {
+                harmonic_decay: 0.2,
+                ..SynthOptions::default()
+            },
+        );
+
+        assert_ne!(default_samples, slower_decay_samples);
     }
 }

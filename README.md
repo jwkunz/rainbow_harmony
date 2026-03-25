@@ -25,7 +25,7 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - positive integer beats
 - optional positive integer BPM, defaulting to `120`
 - additive synthesis using a configurable harmonic count, defaulting to 33 partials
-- exponentially decreasing harmonic intensity
+- exponentially decreasing harmonic intensity with configurable falloff
 - fresh harmonic phase variation on each playback
 - phase modulation enabled by default at 1000 Hz with depth `0.05`
 - overtones independently choose random positive or negative phase sweep directions
@@ -124,6 +124,7 @@ Duplicate notes are allowed.
 
 - `--gain <gain>` sets output gain before normalization, default `1.0`
 - `--harmonics <count>` sets the number of harmonics including the fundamental, default `33`
+- `--harmonic-decay <rate>` sets the exponential harmonic falloff rate, default `0.8`
 - `--phase-mod-rate <hz>` sets phase modulation rate, default `1000.0`
 - `--phase-mod-depth <radians>` sets phase modulation depth, default `0.05`
 - `--amp-tremolo-rate <hz>` sets amplitude tremolo rate, default `3.0`
@@ -142,6 +143,7 @@ rainbow_harmony \
   --bpm 72 \
   --gain 0.8 \
   --harmonics 16 \
+  --harmonic-decay 0.4 \
   --phase-mod-rate 1000 \
   --phase-mod-depth 0.05 \
   --amp-tremolo-rate 3 \
@@ -279,7 +281,7 @@ Examples of invalid input:
 - uses the system default output audio device
 - generates audio samples in-process
 - renders the configured harmonic count for each note
-- uses exponentially decreasing harmonic amplitudes
+- uses exponentially decreasing harmonic amplitudes with configurable falloff
 - varies harmonic phase on each playback
 - modulates oscillator phase with configurable rate and depth
 - applies true vibrato by modulating pitch with configurable rate and cents depth
