@@ -10,10 +10,12 @@ const PHASE_GOLDEN_RATIO: f32 = 2.399_963_1;
 pub struct SynthOptions {
     pub gain: f32,
     pub harmonics: u32,
-    pub phase_tremolo_rate_hz: f32,
-    pub phase_tremolo_depth_radians: f32,
+    pub phase_mod_rate_hz: f32,
+    pub phase_mod_depth_radians: f32,
     pub amp_tremolo_rate_hz: f32,
     pub amp_tremolo_depth: f32,
+    pub vibrato_rate_hz: f32,
+    pub vibrato_depth_cents: f32,
     pub seed: u64,
 }
 
@@ -22,10 +24,12 @@ impl Default for SynthOptions {
         Self {
             gain: 1.0,
             harmonics: 33,
-            phase_tremolo_rate_hz: 1.0,
-            phase_tremolo_depth_radians: PI,
+            phase_mod_rate_hz: 1.0,
+            phase_mod_depth_radians: PI,
             amp_tremolo_rate_hz: 1.0,
             amp_tremolo_depth: 0.1,
+            vibrato_rate_hz: 10.0,
+            vibrato_depth_cents: 3.0,
             seed: 0,
         }
     }
@@ -49,23 +53,27 @@ pub fn render_waveform(
         let note_seed = note_seed_for_playback(frequency, frame_count, options.seed);
 
         for harmonic_index in 1..=options.harmonics {
-            let harmonic_frequency = frequency * harmonic_index as f32;
             let amplitude = (-0.6 * (harmonic_index - 1) as f32).exp();
             let phase = phase_for_harmonic(note_seed, harmonic_index);
             let phase_direction = phase_direction_for_harmonic(note_seed, harmonic_index);
 
             for (sample_index, sample) in samples.iter_mut().enumerate() {
                 let time = sample_index as f32 / sample_rate as f32;
-                let tremolo_phase = phase_direction
-                    * options.phase_tremolo_depth_radians
-                    * (2.0 * PI * options.phase_tremolo_rate_hz * time).sin();
+                let vibrato_frequency_scale = cents_to_ratio(
+                    options.vibrato_depth_cents * (2.0 * PI * options.vibrato_rate_hz * time).sin(),
+                );
+                let harmonic_frequency =
+                    frequency * vibrato_frequency_scale * harmonic_index as f32;
+                let phase_mod = phase_direction
+                    * options.phase_mod_depth_radians
+                    * (2.0 * PI * options.phase_mod_rate_hz * time).sin();
                 let amplitude_tremolo = 1.0
                     + options.amp_tremolo_depth * (2.0 * PI * options.amp_tremolo_rate_hz * time).sin();
                 *sample +=
                     options.gain
                         * amplitude
                         * amplitude_tremolo
-                        * (2.0 * PI * harmonic_frequency * time + phase + tremolo_phase).sin();
+                        * (2.0 * PI * harmonic_frequency * time + phase + phase_mod).sin();
             }
         }
     }
@@ -82,6 +90,10 @@ fn note_seed_for_playback(frequency: f32, frame_count: usize, seed: u64) -> u32 
         ^ seed.wrapping_mul(0xA24B_AED4_963E_E407);
 
     (mixed ^ (mixed >> 32)) as u32
+}
+
+fn cents_to_ratio(cents: f32) -> f32 {
+    2.0_f32.powf(cents / 1200.0)
 }
 
 fn phase_for_harmonic(seed: u32, harmonic_index: u32) -> f32 {
@@ -205,5 +217,27 @@ mod tests {
         );
 
         assert_ne!(default_samples, seeded_samples);
+    }
+
+    #[test]
+    fn vibrato_changes_waveform() {
+        let chord = Chord::parse("A4").unwrap();
+        let no_vibrato_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions {
+                vibrato_depth_cents: 0.0,
+                ..SynthOptions::default()
+            },
+        );
+        let vibrato_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
+
+        assert_ne!(no_vibrato_samples, vibrato_samples);
     }
 }

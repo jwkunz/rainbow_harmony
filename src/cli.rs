@@ -74,15 +74,15 @@ where
                 let value = flag_value(&remaining, &mut index, "--harmonics")?;
                 synth_options.harmonics = parse_positive_integer(value, "harmonics")?;
             }
-            "--phase-tremolo-rate" => {
-                let value = flag_value(&remaining, &mut index, "--phase-tremolo-rate")?;
-                synth_options.phase_tremolo_rate_hz =
-                    parse_non_negative_f32(value, "phase tremolo rate")?;
+            "--phase-mod-rate" => {
+                let value = flag_value(&remaining, &mut index, "--phase-mod-rate")?;
+                synth_options.phase_mod_rate_hz =
+                    parse_non_negative_f32(value, "phase modulation rate")?;
             }
-            "--phase-tremolo-depth" => {
-                let value = flag_value(&remaining, &mut index, "--phase-tremolo-depth")?;
-                synth_options.phase_tremolo_depth_radians =
-                    parse_non_negative_f32(value, "phase tremolo depth")?;
+            "--phase-mod-depth" => {
+                let value = flag_value(&remaining, &mut index, "--phase-mod-depth")?;
+                synth_options.phase_mod_depth_radians =
+                    parse_non_negative_f32(value, "phase modulation depth")?;
             }
             "--amp-tremolo-rate" => {
                 let value = flag_value(&remaining, &mut index, "--amp-tremolo-rate")?;
@@ -97,6 +97,15 @@ where
             "--seed" => {
                 let value = flag_value(&remaining, &mut index, "--seed")?;
                 synth_options.seed = parse_u64(value, "seed")?;
+            }
+            "--vibrato-rate" => {
+                let value = flag_value(&remaining, &mut index, "--vibrato-rate")?;
+                synth_options.vibrato_rate_hz = parse_non_negative_f32(value, "vibrato rate")?;
+            }
+            "--vibrato-depth-cents" => {
+                let value = flag_value(&remaining, &mut index, "--vibrato-depth-cents")?;
+                synth_options.vibrato_depth_cents =
+                    parse_non_negative_f32(value, "vibrato depth")?;
             }
             flag if flag.starts_with("--") => {
                 return Err(RainbowError::usage(format!("unknown flag `{flag}`")));
@@ -277,10 +286,12 @@ Duration:
 Synthesis:
   --gain <gain>                        Output gain before normalization, default 1.0
   --harmonics <count>                  Harmonic count including the fundamental, default 33
-  --phase-tremolo-rate <hz>            Phase modulation rate in Hz, default 1.0
-  --phase-tremolo-depth <radians>      Phase modulation depth in radians, default 3.1415927
+  --phase-mod-rate <hz>                Phase modulation rate in Hz, default 1.0
+  --phase-mod-depth <radians>          Phase modulation depth in radians, default 3.1415927
   --amp-tremolo-rate <hz>              Amplitude tremolo rate in Hz, default 1.0
   --amp-tremolo-depth <depth>          Amplitude tremolo depth from 0.0 to 1.0, default 0.1
+  --vibrato-rate <hz>                  Vibrato rate in Hz, default 10.0
+  --vibrato-depth-cents <cents>        Vibrato depth in cents, default 3.0
   --seed <integer>                     Seed for reproducible phase variation, default 0
 
 Notes:
@@ -353,14 +364,18 @@ mod tests {
             "0.8".to_string(),
             "--harmonics".to_string(),
             "12".to_string(),
-            "--phase-tremolo-rate".to_string(),
+            "--phase-mod-rate".to_string(),
             "0.5".to_string(),
-            "--phase-tremolo-depth".to_string(),
+            "--phase-mod-depth".to_string(),
             "1.57".to_string(),
             "--amp-tremolo-rate".to_string(),
             "2.0".to_string(),
             "--amp-tremolo-depth".to_string(),
             "0.25".to_string(),
+            "--vibrato-rate".to_string(),
+            "8.0".to_string(),
+            "--vibrato-depth-cents".to_string(),
+            "15.0".to_string(),
             "--seed".to_string(),
             "42".to_string(),
         ])
@@ -372,10 +387,12 @@ mod tests {
 
         assert_eq!(command.synth_options.gain, 0.8);
         assert_eq!(command.synth_options.harmonics, 12);
-        assert_eq!(command.synth_options.phase_tremolo_rate_hz, 0.5);
-        assert_eq!(command.synth_options.phase_tremolo_depth_radians, 1.57);
+        assert_eq!(command.synth_options.phase_mod_rate_hz, 0.5);
+        assert_eq!(command.synth_options.phase_mod_depth_radians, 1.57);
         assert_eq!(command.synth_options.amp_tremolo_rate_hz, 2.0);
         assert_eq!(command.synth_options.amp_tremolo_depth, 0.25);
+        assert_eq!(command.synth_options.vibrato_rate_hz, 8.0);
+        assert_eq!(command.synth_options.vibrato_depth_cents, 15.0);
         assert_eq!(command.synth_options.seed, 42);
     }
 
