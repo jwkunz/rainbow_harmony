@@ -27,18 +27,18 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - additive synthesis using a configurable harmonic count, defaulting to 33 partials
 - exponentially decreasing harmonic intensity
 - fresh harmonic phase variation on each playback
-- optional phase modulation with configurable rate and depth, default depth `0.0`
+- phase modulation enabled by default at 1000 Hz with depth `0.05`
 - overtones independently choose random positive or negative phase sweep directions
-- configurable amplitude tremolo rate and depth
-- default vibrato at 2 Hz with 0.75 cents of depth
-- white noise mixed in at a default depth of 1%
+- amplitude tremolo defaulting to 3 Hz with depth `0.05`
+- default vibrato at 5 Hz with 0.25 cents of depth
+- white noise mixed in at a default depth of 2%
 - reproducible seeded phase variation
 - final waveform peak-normalized to `1.0`
 
 ## Command Syntax
 
 ```bash
-rainbow_harmony --notes <notes> (--beats <beats> [--bpm <bpm>] | --seconds <seconds>) [options]
+rainbow_harmony --notes <notes> [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
 ```
 
 Examples:
@@ -50,6 +50,7 @@ rainbow_harmony --notes Bb3 --beats 4
 rainbow_harmony --notes C4+E4+G4 --beats 2
 rainbow_harmony --notes A3+C#4+E4 --beats 4 --bpm 90
 rainbow_harmony --notes A4 --seconds 1.5
+rainbow_harmony --notes A4
 rainbow_harmony --notes A4 --seconds 2.0 --harmonics 12 --amp-tremolo-depth 0.2
 ```
 
@@ -114,22 +115,22 @@ Duplicate notes are allowed.
 ## Duration
 
 - `--notes` is required
-- use exactly one of `--beats` or `--seconds`
+- use at most one of `--beats` or `--seconds`
 - `--beats` must be a positive integer
-- `--seconds` must be a positive number
+- `--seconds` must be a positive number and defaults to `2.0` when omitted
 - `--bpm` is optional, defaults to `120`, and may only be used with `--beats`
 
 ## Synthesis Flags
 
 - `--gain <gain>` sets output gain before normalization, default `1.0`
 - `--harmonics <count>` sets the number of harmonics including the fundamental, default `33`
-- `--phase-mod-rate <hz>` sets phase modulation rate, default `1.0`
-- `--phase-mod-depth <radians>` sets phase modulation depth, default `0.0`
-- `--amp-tremolo-rate <hz>` sets amplitude tremolo rate, default `1.0`
-- `--amp-tremolo-depth <depth>` sets amplitude tremolo depth from `0.0` to `1.0`, default `0.1`
-- `--vibrato-rate <hz>` sets vibrato rate, default `2.0`
-- `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `0.75`
-- `--noise-depth <depth>` sets white noise depth from `0.0` to `1.0`, default `0.01`
+- `--phase-mod-rate <hz>` sets phase modulation rate, default `1000.0`
+- `--phase-mod-depth <radians>` sets phase modulation depth, default `0.05`
+- `--amp-tremolo-rate <hz>` sets amplitude tremolo rate, default `3.0`
+- `--amp-tremolo-depth <depth>` sets amplitude tremolo depth from `0.0` to `1.0`, default `0.05`
+- `--vibrato-rate <hz>` sets vibrato rate, default `5.0`
+- `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `0.25`
+- `--noise-depth <depth>` sets white noise depth from `0.0` to `1.0`, default `0.02`
 - `--seed <integer>` sets a deterministic seed for reproducible phase variation
 
 Example:
@@ -141,12 +142,12 @@ rainbow_harmony \
   --bpm 72 \
   --gain 0.8 \
   --harmonics 16 \
-  --phase-mod-rate 0.5 \
-  --phase-mod-depth 1.57 \
-  --amp-tremolo-rate 1.25 \
+  --phase-mod-rate 1000 \
+  --phase-mod-depth 0.05 \
+  --amp-tremolo-rate 3 \
   --amp-tremolo-depth 0.2 \
-  --vibrato-rate 8.0 \
-  --vibrato-depth-cents 15 \
+  --vibrato-rate 5 \
+  --vibrato-depth-cents 0.25 \
   --noise-depth 0.03 \
   --seed 42
 ```
@@ -231,10 +232,10 @@ If you want the command available globally, move the binary into a directory tha
 
 ## Usage Examples
 
-Play middle C for two beats at the default tempo:
+Play middle C for the default two-second duration:
 
 ```bash
-rainbow_harmony --notes C4 --beats 2
+rainbow_harmony --notes C4
 ```
 
 Play A major as a chord for three beats:

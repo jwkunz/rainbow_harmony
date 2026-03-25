@@ -5,6 +5,7 @@ use crate::error::RainbowError;
 use crate::synth::SynthOptions;
 
 pub const DEFAULT_BPM: u32 = 120;
+pub const DEFAULT_SECONDS: f64 = 2.0;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliCommand {
@@ -145,9 +146,13 @@ where
             ));
         }
         (None, None) => {
-            return Err(RainbowError::usage(
-                "missing duration; use exactly one of --beats or --seconds",
-            ));
+            if bpm != DEFAULT_BPM {
+                return Err(RainbowError::usage(
+                    "--bpm may only be used together with --beats",
+                ));
+            }
+
+            Duration::from_secs_f64(DEFAULT_SECONDS)
         }
     };
 
@@ -285,24 +290,25 @@ Required:
 
 Duration:
   --beats <beats>      Positive integer beat count
-  --seconds <seconds>  Positive duration in seconds
+  --seconds <seconds>  Positive duration in seconds, default {DEFAULT_SECONDS}
   --bpm <bpm>          Optional positive integer tempo, defaults to {DEFAULT_BPM}
 
 Synthesis:
   --gain <gain>                        Output gain before normalization, default 1.0
   --harmonics <count>                  Harmonic count including the fundamental, default 33
-  --phase-mod-rate <hz>                Phase modulation rate in Hz, default 1.0
-  --phase-mod-depth <radians>          Phase modulation depth in radians, default 0.0
-  --amp-tremolo-rate <hz>              Amplitude tremolo rate in Hz, default 1.0
-  --amp-tremolo-depth <depth>          Amplitude tremolo depth from 0.0 to 1.0, default 0.1
-  --vibrato-rate <hz>                  Vibrato rate in Hz, default 2.0
-  --vibrato-depth-cents <cents>        Vibrato depth in cents, default 0.75
-  --noise-depth <depth>                White noise depth from 0.0 to 1.0, default 0.01
+  --phase-mod-rate <hz>                Phase modulation rate in Hz, default 1000.0
+  --phase-mod-depth <radians>          Phase modulation depth in radians, default 0.05
+  --amp-tremolo-rate <hz>              Amplitude tremolo rate in Hz, default 3.0
+  --amp-tremolo-depth <depth>          Amplitude tremolo depth from 0.0 to 1.0, default 0.05
+  --vibrato-rate <hz>                  Vibrato rate in Hz, default 5.0
+  --vibrato-depth-cents <cents>        Vibrato depth in cents, default 0.25
+  --noise-depth <depth>                White noise depth from 0.0 to 1.0, default 0.02
   --seed <integer>                     Seed for reproducible phase variation, default 0
 
 Notes:
   - This CLI no longer accepts positional arguments
-  - Use exactly one of --beats or --seconds
+  - If neither --beats nor --seconds is provided, playback defaults to 2.0 seconds
+  - Do not use --beats and --seconds together
   - --bpm may only be used with --beats
   - Note letters A through G are accepted in either case
   - Sharps use # and flats use b, for example C#4 or Bb3
@@ -316,7 +322,7 @@ Notes:
 mod tests {
     use std::time::Duration;
 
-    use super::{ParseOutcome, SynthOptions, parse_args};
+    use super::{DEFAULT_SECONDS, ParseOutcome, SynthOptions, parse_args};
 
     #[test]
     fn parses_valid_beat_arguments() {
@@ -356,6 +362,22 @@ mod tests {
         };
 
         assert_eq!(command.duration, Duration::from_secs_f64(1.5));
+    }
+
+    #[test]
+    fn defaults_to_two_seconds_when_duration_is_omitted() {
+        let outcome = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--notes".to_string(),
+            "A4".to_string(),
+        ])
+        .unwrap();
+
+        let ParseOutcome::Run(command) = outcome else {
+            panic!("expected run outcome");
+        };
+
+        assert_eq!(command.duration, Duration::from_secs_f64(DEFAULT_SECONDS));
     }
 
     #[test]
@@ -441,16 +463,18 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_duration_flag() {
+    fn rejects_bpm_without_beats() {
         let error = parse_args(vec![
             "rainbow_harmony".to_string(),
             "--notes".to_string(),
             "A4".to_string(),
+            "--bpm".to_string(),
+            "90".to_string(),
         ])
         .unwrap_err()
         .to_string();
 
-        assert!(error.contains("missing duration"));
+        assert!(error.contains("--bpm may only be used together with --beats"));
     }
 
     #[test]
