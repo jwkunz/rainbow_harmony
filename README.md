@@ -7,7 +7,7 @@ You give it:
 - a note or chord expression such as `A4` or `C4+E4+G4` via `--notes`
 - either a duration in beats via `--beats` with optional `--bpm`
 - or an absolute duration via `--seconds`
-- optional synthesis controls such as `--gain`, `--harmonics`, phase modulation, vibrato, tremolo, and `--seed`
+- optional synthesis controls such as `--gain`, `--harmonics`, phase modulation, vibrato, tremolo, white noise, and `--seed`
 
 It generates the waveform in-process, adds a short fade-in and fade-out to reduce clicks, and blocks until playback finishes.
 
@@ -31,6 +31,7 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 - overtones independently choose random positive or negative phase sweep directions
 - configurable amplitude tremolo rate and depth
 - default vibrato at 2 Hz with 0.75 cents of depth
+- white noise mixed in at a default depth of 1%
 - reproducible seeded phase variation
 - final waveform peak-normalized to `1.0`
 
@@ -128,6 +129,7 @@ Duplicate notes are allowed.
 - `--amp-tremolo-depth <depth>` sets amplitude tremolo depth from `0.0` to `1.0`, default `0.1`
 - `--vibrato-rate <hz>` sets vibrato rate, default `2.0`
 - `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `0.75`
+- `--noise-depth <depth>` sets white noise depth from `0.0` to `1.0`, default `0.01`
 - `--seed <integer>` sets a deterministic seed for reproducible phase variation
 
 Example:
@@ -145,6 +147,7 @@ rainbow_harmony \
   --amp-tremolo-depth 0.2 \
   --vibrato-rate 8.0 \
   --vibrato-depth-cents 15 \
+  --noise-depth 0.03 \
   --seed 42
 ```
 
@@ -281,6 +284,7 @@ Examples of invalid input:
 - applies true vibrato by modulating pitch with configurable rate and cents depth
 - assigns each overtone its own per-playback positive or negative phase modulation direction
 - applies amplitude modulation with configurable rate and depth
+- mixes in configurable white noise
 - supports deterministic seeded phase variation for repeatable results
 - applies a short fade-in and fade-out
 - normalizes the final mixed waveform to a peak amplitude of `1.0`

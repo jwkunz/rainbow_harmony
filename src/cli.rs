@@ -107,6 +107,11 @@ where
                 synth_options.vibrato_depth_cents =
                     parse_non_negative_f32(value, "vibrato depth")?;
             }
+            "--noise-depth" => {
+                let value = flag_value(&remaining, &mut index, "--noise-depth")?;
+                synth_options.noise_depth =
+                    parse_inclusive_f32_range(value, "noise depth", 0.0, 1.0)?;
+            }
             flag if flag.starts_with("--") => {
                 return Err(RainbowError::usage(format!("unknown flag `{flag}`")));
             }
@@ -292,6 +297,7 @@ Synthesis:
   --amp-tremolo-depth <depth>          Amplitude tremolo depth from 0.0 to 1.0, default 0.1
   --vibrato-rate <hz>                  Vibrato rate in Hz, default 2.0
   --vibrato-depth-cents <cents>        Vibrato depth in cents, default 0.75
+  --noise-depth <depth>                White noise depth from 0.0 to 1.0, default 0.01
   --seed <integer>                     Seed for reproducible phase variation, default 0
 
 Notes:
@@ -376,6 +382,8 @@ mod tests {
             "8.0".to_string(),
             "--vibrato-depth-cents".to_string(),
             "15.0".to_string(),
+            "--noise-depth".to_string(),
+            "0.05".to_string(),
             "--seed".to_string(),
             "42".to_string(),
         ])
@@ -393,6 +401,7 @@ mod tests {
         assert_eq!(command.synth_options.amp_tremolo_depth, 0.25);
         assert_eq!(command.synth_options.vibrato_rate_hz, 8.0);
         assert_eq!(command.synth_options.vibrato_depth_cents, 15.0);
+        assert_eq!(command.synth_options.noise_depth, 0.05);
         assert_eq!(command.synth_options.seed, 42);
     }
 
@@ -493,5 +502,22 @@ mod tests {
         .to_string();
 
         assert!(error.contains("amplitude tremolo depth"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_noise_depth() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--seconds".to_string(),
+            "1.0".to_string(),
+            "--noise-depth".to_string(),
+            "1.5".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("noise depth"));
     }
 }

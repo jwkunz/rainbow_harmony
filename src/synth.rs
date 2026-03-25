@@ -16,6 +16,7 @@ pub struct SynthOptions {
     pub amp_tremolo_depth: f32,
     pub vibrato_rate_hz: f32,
     pub vibrato_depth_cents: f32,
+    pub noise_depth: f32,
     pub seed: u64,
 }
 
@@ -30,6 +31,7 @@ impl Default for SynthOptions {
             amp_tremolo_depth: 0.1,
             vibrato_rate_hz: 2.0,
             vibrato_depth_cents: 0.75,
+            noise_depth: 0.01,
             seed: 0,
         }
     }
@@ -78,6 +80,7 @@ pub fn render_waveform(
         }
     }
 
+    add_white_noise(&mut samples, frame_count, options);
     apply_fade(&mut samples, sample_rate);
     normalize_peak(&mut samples);
 
@@ -94,6 +97,22 @@ fn note_seed_for_playback(frequency: f32, frame_count: usize, seed: u64) -> u32 
 
 fn cents_to_ratio(cents: f32) -> f32 {
     2.0_f32.powf(cents / 1200.0)
+}
+
+fn add_white_noise(samples: &mut [f32], frame_count: usize, options: SynthOptions) {
+    if options.noise_depth <= 0.0 {
+        return;
+    }
+
+    let mut state = options.seed ^ (frame_count as u64).wrapping_mul(0xD1B5_4A32_D192_ED03);
+    for sample in samples {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let normalized = ((state >> 32) as u32) as f32 / u32::MAX as f32;
+        let noise = normalized * 2.0 - 1.0;
+        *sample += options.noise_depth * noise;
+    }
 }
 
 fn phase_for_harmonic(seed: u32, harmonic_index: u32) -> f32 {
@@ -239,5 +258,27 @@ mod tests {
         );
 
         assert_ne!(no_vibrato_samples, vibrato_samples);
+    }
+
+    #[test]
+    fn noise_changes_waveform() {
+        let chord = Chord::parse("A4").unwrap();
+        let no_noise_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions {
+                noise_depth: 0.0,
+                ..SynthOptions::default()
+            },
+        );
+        let noise_samples = render_waveform(
+            &chord,
+            Duration::from_millis(100),
+            48_000,
+            SynthOptions::default(),
+        );
+
+        assert_ne!(no_noise_samples, noise_samples);
     }
 }
