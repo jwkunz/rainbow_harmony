@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rainbow Harmony</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Rainbow Harmony</p>
+        <h1>Browser synth playground</h1>
+        <p class="lede">
+          Render notes, chord symbols, and sticky progressions in the browser
+          using the shared Rust synthesis engine compiled to WebAssembly.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="mode-row">
+          <label for="mode">Input mode</label>
+          <select id="mode" name="mode">
+            <option value="event">Single event</option>
+            <option value="progression">Progression</option>
+          </select>
+        </div>
+
+        <div class="mode-row">
+          <label for="eventInput">Event flags</label>
+          <textarea id="eventInput" rows="4">--chord Cmaj7 --beats 2 --bpm 120</textarea>
+        </div>
+
+        <div class="mode-row">
+          <label for="progressionInput">Progression text</label>
+          <textarea id="progressionInput" rows="6">--chord Cmaj7 --beats 2 --bpm 120 => --chord Am7 => --chord Dm7 => --chord G7</textarea>
+        </div>
+
+        <div class="grid">
+          <label>
+            Sample rate
+            <input id="sampleRate" type="number" min="8000" step="1000" value="48000" />
+          </label>
+          <label>
+            Progression mode
+            <select id="progressionMode">
+              <option value="stitched">stitched</option>
+              <option value="separate">separate</option>
+            </select>
+          </label>
+          <label>
+            Gap ms
+            <input id="gapMs" type="number" min="0" step="1" value="0" />
+          </label>
+          <label>
+            Legato ms
+            <input id="legatoMs" type="number" min="0" step="1" value="0" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="renderPlayButton" type="button">Render and Play</button>
+          <button id="stopButton" type="button" class="secondary">Stop</button>
+        </div>
+
+        <div class="status-panel">
+          <p id="status">Wasm package not loaded yet.</p>
+          <p id="renderStats" class="muted"></p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

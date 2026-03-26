@@ -282,6 +282,21 @@ Build the wasm bindings crate:
 ```bash
 cargo build -p rainbow_harmony_web_wasm --target wasm32-unknown-unknown
 ```
+
+Build the browser-ready wasm package:
+
+```bash
+./scripts/build_wasm.sh
+```
+
+Then serve the `web/` directory with any static file server, for example:
+
+```bash
+cd web
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000`.
 - a working default audio output device
 - platform audio development libraries if your OS requires them for native builds
 
