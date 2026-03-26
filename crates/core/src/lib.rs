@@ -1,6 +1,5 @@
-pub mod audio;
 pub mod chord;
-pub mod cli;
 pub mod error;
 pub mod note;
+pub mod progression;
 pub mod synth;

@@ -4,9 +4,9 @@ use std::time::Duration;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, SampleFormat, SizedSample, StreamConfig, SupportedStreamConfig};
 
-use crate::cli::{CliCommand, ProgressionMode, ProgressionPlaybackOptions};
-use crate::error::RainbowError;
-use crate::synth::{SynthOptions, render_waveform};
+use rainbow_harmony_core::error::RainbowError;
+use rainbow_harmony_core::progression::{PlaybackEvent, ProgressionMode, ProgressionPlaybackOptions};
+use rainbow_harmony_core::synth::{SynthOptions, render_waveform};
 
 struct PlaybackState {
     samples: Vec<f32>,
@@ -15,7 +15,7 @@ struct PlaybackState {
 }
 
 pub fn play_waveform_blocking(
-    chord: &crate::chord::Chord,
+    chord: &rainbow_harmony_core::chord::Chord,
     duration: Duration,
     synth_options: SynthOptions,
 ) -> Result<(), RainbowError> {
@@ -25,7 +25,7 @@ pub fn play_waveform_blocking(
 }
 
 pub fn play_progression_blocking(
-    commands: &[CliCommand],
+    commands: &[PlaybackEvent],
     options: ProgressionPlaybackOptions,
 ) -> Result<(), RainbowError> {
     match options.mode {
@@ -38,7 +38,7 @@ pub fn play_progression_blocking(
     }
 }
 
-fn play_progression_separate(commands: &[CliCommand], gap_ms: u32) -> Result<(), RainbowError> {
+fn play_progression_separate(commands: &[PlaybackEvent], gap_ms: u32) -> Result<(), RainbowError> {
     for (index, command) in commands.iter().enumerate() {
         play_waveform_blocking(&command.chord, command.duration, command.synth_options)?;
 
@@ -51,7 +51,7 @@ fn play_progression_separate(commands: &[CliCommand], gap_ms: u32) -> Result<(),
 }
 
 fn render_progression_waveform(
-    commands: &[CliCommand],
+    commands: &[PlaybackEvent],
     sample_rate: u32,
     options: ProgressionPlaybackOptions,
 ) -> Vec<f32> {

@@ -266,7 +266,7 @@ Clone and build:
 ```bash
 git clone <your-repo-url>
 cd rainbow_harmony
-cargo build --release
+cargo build --release -p rainbow_harmony
 ```
 
 Run from the release binary:
@@ -396,8 +396,13 @@ cargo fmt
 Run the CLI directly during development:
 
 ```bash
-cargo run -- --notes C4+E4+G4 --beats 2
+cargo run -p rainbow_harmony -- --notes C4+E4+G4 --beats 2
 ```
+
+Current workspace layout:
+
+- `crates/core`: shared parsing, progression, and synthesis logic
+- `crates/cli`: terminal interface and native audio playback
 
 ## Roadmap
 

@@ -452,7 +452,12 @@ name = "rainbow_harmony"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "rainbow_harmony_core",
 ]
+
+[[package]]
+name = "rainbow_harmony_core"
+version = "0.1.0"
 
 [[package]]
 name = "rustversion"

@@ -1,0 +1,8 @@
+[package]
+name = "rainbow_harmony_core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rainbow_harmony_core"
+path = "src/lib.rs"

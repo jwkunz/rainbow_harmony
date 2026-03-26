@@ -1,7 +1,6 @@
-[package]
-name = "rainbow_harmony"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-cpal = "0.16"
+[workspace]
+members = [
+    "crates/core",
+    "crates/cli",
+]
+resolver = "2"
