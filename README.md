@@ -40,6 +40,8 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 
 ```bash
 rainbow_harmony (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
+rainbow_harmony --progression '<event => event => event>'
+rainbow_harmony --progression-file <path>
 ```
 
 Examples:
@@ -55,6 +57,7 @@ rainbow_harmony --chord C/E --beats 2
 rainbow_harmony --notes A3+C#4+E4 --beats 4 --bpm 90
 rainbow_harmony --notes A4 --seconds 1.5
 rainbow_harmony --notes A4
+rainbow_harmony --progression '--chord Cmaj7 --beats 2 --bpm 120 => --chord Cmin --beats 3'
 rainbow_harmony --notes A4 --seconds 2.0 --harmonics 12 --amp-tremolo-depth 0.2
 ```
 
@@ -152,6 +155,26 @@ Parsing rule:
 - `--beats` must be a positive integer
 - `--seconds` must be a positive number and defaults to `2.0` when omitted
 - `--bpm` is optional, defaults to `120`, and may only be used with `--beats`
+
+## Progressions
+
+- `--progression <text>` plays multiple events separated by `=>`
+- `--progression-file <path>` loads the same progression format from a file
+- omitted settings stay sticky from one event to the next
+- progressions are a separate mode and cannot be combined with one-event flags at the top level
+
+Example:
+
+```bash
+rainbow_harmony --progression \
+  '--chord Cmaj7 --beats 2 --bpm 120 => --chord Cmin --beats 3 => --chord F7'
+```
+
+This resolves as:
+
+- first event: `--chord Cmaj7 --beats 2 --bpm 120`
+- second event: `--chord Cmin --beats 3 --bpm 120`
+- third event: `--chord F7 --beats 3 --bpm 120`
 
 ## Synthesis Flags
 

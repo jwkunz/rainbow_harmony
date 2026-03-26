@@ -14,9 +14,48 @@ pub struct CliCommand {
     pub synth_options: SynthOptions,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum InputSpec {
+    Notes(String),
+    Chord(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct DurationState {
+    beats: Option<u32>,
+    seconds: Option<f64>,
+    bpm: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PartialCommand {
+    input_spec: Option<InputSpec>,
+    beats: Option<u32>,
+    seconds: Option<f64>,
+    bpm: Option<u32>,
+    synth_options: SynthOptionsPatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+struct SynthOptionsPatch {
+    gain: Option<f32>,
+    harmonics: Option<u32>,
+    harmonic_decay: Option<f32>,
+    phase_mod_rate_hz: Option<f32>,
+    phase_mod_depth_radians: Option<f32>,
+    amp_tremolo_rate_hz: Option<f32>,
+    amp_tremolo_depth: Option<f32>,
+    vibrato_rate_hz: Option<f32>,
+    vibrato_depth_cents: Option<f32>,
+    noise_depth: Option<f32>,
+    seed: Option<u64>,
+}
+
 #[derive(Debug)]
 pub enum ParseOutcome {
     Run(CliCommand),
+    RunProgression(Vec<CliCommand>),
+    RunProgressionFile(String),
     Help,
 }
 
@@ -27,12 +66,6 @@ where
     let mut args = args.into_iter();
     let _program = args.next().unwrap_or_else(|| "rainbow_harmony".to_string());
     let remaining: Vec<String> = args.collect();
-    let mut notes = None::<String>;
-    let mut chord_name = None::<String>;
-    let mut beats = None::<u32>;
-    let mut bpm = DEFAULT_BPM;
-    let mut seconds = None::<f64>;
-    let mut synth_options = SynthOptions::default();
 
     if remaining.is_empty() {
         return Err(RainbowError::usage(
@@ -40,88 +73,313 @@ where
         ));
     }
 
+    if remaining.len() == 1 && matches!(remaining[0].as_str(), "--help" | "-h") {
+        return Ok(ParseOutcome::Help);
+    }
+
+    let mut progression = None::<String>;
+    let mut progression_file = None::<String>;
     let mut index = 0;
     while index < remaining.len() {
         match remaining[index].as_str() {
-            "--help" | "-h" => {
-                if remaining.len() == 1 {
-                    return Ok(ParseOutcome::Help);
-                }
+            "--progression" => {
+                let value = raw_flag_value(&remaining, &mut index, "--progression")?;
+                progression = Some(value.to_string());
+            }
+            "--progression-file" => {
+                let value = raw_flag_value(&remaining, &mut index, "--progression-file")?;
+                progression_file = Some(value.to_string());
+            }
+            _ => {}
+        }
 
+        index += 1;
+    }
+
+    match (progression, progression_file) {
+        (Some(_), Some(_)) => {
+            return Err(RainbowError::usage(
+                "use at most one of --progression or --progression-file",
+            ));
+        }
+        (Some(text), None) => {
+            if remaining.len() > 2 {
                 return Err(RainbowError::usage(
-                    "--help must be used by itself",
+                    "--progression cannot be combined with other event flags",
                 ));
             }
+            return Ok(ParseOutcome::RunProgression(parse_progression_text(&text)?));
+        }
+        (None, Some(path)) => {
+            if remaining.len() > 2 {
+                return Err(RainbowError::usage(
+                    "--progression-file cannot be combined with other event flags",
+                ));
+            }
+            return Ok(ParseOutcome::RunProgressionFile(path));
+        }
+        (None, None) => {}
+    }
+
+    let partial = parse_partial_command_args(&remaining)?;
+    let command = build_single_command(partial)?;
+
+    Ok(ParseOutcome::Run(command))
+}
+
+pub fn parse_progression_text(text: &str) -> Result<Vec<CliCommand>, RainbowError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err(RainbowError::usage("progression cannot be empty"));
+    }
+
+    let mut state = ProgressionState::default();
+    let mut commands = Vec::new();
+
+    for (index, segment) in trimmed.split("=>").enumerate() {
+        let segment = segment.trim();
+        if segment.is_empty() {
+            return Err(RainbowError::usage(format!(
+                "progression contains an empty segment at position {}",
+                index + 1
+            )));
+        }
+
+        let args = tokenize_progression_segment(segment);
+        let partial = parse_partial_command_args(&args)
+            .map_err(|error| RainbowError::usage(format!("progression segment {}: {error}", index + 1)))?;
+        state.apply(partial)?;
+        commands.push(state.to_command().map_err(|error| {
+            RainbowError::usage(format!("progression segment {}: {error}", index + 1))
+        })?);
+    }
+
+    Ok(commands)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ProgressionState {
+    input_spec: Option<InputSpec>,
+    duration: DurationState,
+    synth_options: SynthOptions,
+}
+
+impl Default for ProgressionState {
+    fn default() -> Self {
+        Self {
+            input_spec: None,
+            duration: DurationState {
+                beats: None,
+                seconds: Some(DEFAULT_SECONDS),
+                bpm: DEFAULT_BPM,
+            },
+            synth_options: SynthOptions::default(),
+        }
+    }
+}
+
+impl ProgressionState {
+    fn apply(&mut self, partial: PartialCommand) -> Result<(), RainbowError> {
+        if let Some(input_spec) = partial.input_spec {
+            self.input_spec = Some(input_spec);
+        }
+
+        if let Some(beats) = partial.beats {
+            self.duration.beats = Some(beats);
+            self.duration.seconds = None;
+        }
+
+        if let Some(seconds) = partial.seconds {
+            self.duration.seconds = Some(seconds);
+            self.duration.beats = None;
+        }
+
+        if let Some(bpm) = partial.bpm {
+            self.duration.bpm = bpm;
+        }
+
+        self.synth_options = merge_synth_options(self.synth_options, partial.synth_options);
+        Ok(())
+    }
+
+    fn to_command(&self) -> Result<CliCommand, RainbowError> {
+        let input_spec = self
+            .input_spec
+            .as_ref()
+            .ok_or_else(|| RainbowError::usage("missing required input; use exactly one of --notes or --chord"))?;
+        build_command_from_state(input_spec, &self.duration, self.synth_options)
+    }
+}
+
+fn build_single_command(partial: PartialCommand) -> Result<CliCommand, RainbowError> {
+    let input_spec = partial
+        .input_spec
+        .ok_or_else(|| RainbowError::usage("missing required input; use exactly one of --notes or --chord"))?;
+    if partial.bpm.is_some() && partial.beats.is_none() {
+        return Err(RainbowError::usage(
+            "--bpm may only be used together with --beats",
+        ));
+    }
+    let duration = DurationState {
+        beats: partial.beats,
+        seconds: if partial.beats.is_some() {
+            None
+        } else {
+            partial.seconds.or(Some(DEFAULT_SECONDS))
+        },
+        bpm: partial.bpm.unwrap_or(DEFAULT_BPM),
+    };
+
+    build_command_from_state(&input_spec, &duration, merge_synth_options(SynthOptions::default(), partial.synth_options))
+}
+
+fn build_command_from_state(
+    input_spec: &InputSpec,
+    duration_state: &DurationState,
+    synth_options: SynthOptions,
+) -> Result<CliCommand, RainbowError> {
+    let chord = match input_spec {
+        InputSpec::Notes(notes) => Chord::parse_notes(notes)?,
+        InputSpec::Chord(chord_name) => Chord::parse_symbol_name(chord_name)?,
+    };
+
+    let duration = match (duration_state.beats, duration_state.seconds) {
+        (Some(beats), None) => Duration::from_secs_f64(beats as f64 * 60.0 / duration_state.bpm as f64),
+        (None, Some(seconds)) => Duration::from_secs_f64(seconds),
+        (Some(_), Some(_)) => {
+            return Err(RainbowError::usage(
+                "use exactly one of --beats or --seconds",
+            ));
+        }
+        (None, None) => Duration::from_secs_f64(DEFAULT_SECONDS),
+    };
+
+    Ok(CliCommand {
+        chord,
+        duration,
+        synth_options,
+    })
+}
+
+fn merge_synth_options(base: SynthOptions, patch: SynthOptionsPatch) -> SynthOptions {
+    SynthOptions {
+        gain: patch.gain.unwrap_or(base.gain),
+        harmonics: patch.harmonics.unwrap_or(base.harmonics),
+        harmonic_decay: patch.harmonic_decay.unwrap_or(base.harmonic_decay),
+        phase_mod_rate_hz: patch.phase_mod_rate_hz.unwrap_or(base.phase_mod_rate_hz),
+        phase_mod_depth_radians: patch
+            .phase_mod_depth_radians
+            .unwrap_or(base.phase_mod_depth_radians),
+        amp_tremolo_rate_hz: patch
+            .amp_tremolo_rate_hz
+            .unwrap_or(base.amp_tremolo_rate_hz),
+        amp_tremolo_depth: patch.amp_tremolo_depth.unwrap_or(base.amp_tremolo_depth),
+        vibrato_rate_hz: patch.vibrato_rate_hz.unwrap_or(base.vibrato_rate_hz),
+        vibrato_depth_cents: patch
+            .vibrato_depth_cents
+            .unwrap_or(base.vibrato_depth_cents),
+        noise_depth: patch.noise_depth.unwrap_or(base.noise_depth),
+        seed: patch.seed.unwrap_or(base.seed),
+    }
+}
+
+fn tokenize_progression_segment(segment: &str) -> Vec<String> {
+    segment.split_whitespace().map(str::to_string).collect()
+}
+
+fn parse_partial_command_args(args: &[String]) -> Result<PartialCommand, RainbowError> {
+    let mut notes = None::<String>;
+    let mut chord_name = None::<String>;
+    let mut beats = None::<u32>;
+    let mut bpm = None::<u32>;
+    let mut seconds = None::<f64>;
+    let mut synth_options = SynthOptionsPatch::default();
+
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--help" | "-h" => {
+                return Err(RainbowError::usage("--help must be used by itself"));
+            }
             "--notes" => {
-                let value = flag_value(&remaining, &mut index, "--notes")?;
+                let value = flag_value(args, &mut index, "--notes")?;
                 notes = Some(value.to_string());
             }
             "--chord" => {
-                let value = flag_value(&remaining, &mut index, "--chord")?;
+                let value = flag_value(args, &mut index, "--chord")?;
                 chord_name = Some(value.to_string());
             }
             "--beats" => {
-                let value = flag_value(&remaining, &mut index, "--beats")?;
+                let value = flag_value(args, &mut index, "--beats")?;
                 beats = Some(parse_positive_integer(value, "beats")?);
             }
             "--bpm" => {
-                let value = flag_value(&remaining, &mut index, "--bpm")?;
-                bpm = parse_positive_integer(value, "bpm")?;
+                let value = flag_value(args, &mut index, "--bpm")?;
+                bpm = Some(parse_positive_integer(value, "bpm")?);
             }
             "--seconds" => {
-                let value = flag_value(&remaining, &mut index, "--seconds")?;
+                let value = flag_value(args, &mut index, "--seconds")?;
                 seconds = Some(parse_positive_seconds(value)?);
             }
             "--gain" => {
-                let value = flag_value(&remaining, &mut index, "--gain")?;
-                synth_options.gain = parse_positive_f32(value, "gain")?;
+                let value = flag_value(args, &mut index, "--gain")?;
+                synth_options.gain = Some(parse_positive_f32(value, "gain")?);
             }
             "--harmonics" => {
-                let value = flag_value(&remaining, &mut index, "--harmonics")?;
-                synth_options.harmonics = parse_positive_integer(value, "harmonics")?;
+                let value = flag_value(args, &mut index, "--harmonics")?;
+                synth_options.harmonics = Some(parse_positive_integer(value, "harmonics")?);
             }
             "--harmonic-decay" => {
-                let value = flag_value(&remaining, &mut index, "--harmonic-decay")?;
-                synth_options.harmonic_decay =
-                    parse_non_negative_f32(value, "harmonic decay")?;
+                let value = flag_value(args, &mut index, "--harmonic-decay")?;
+                synth_options.harmonic_decay = Some(parse_non_negative_f32(value, "harmonic decay")?);
             }
             "--phase-mod-rate" => {
-                let value = flag_value(&remaining, &mut index, "--phase-mod-rate")?;
+                let value = flag_value(args, &mut index, "--phase-mod-rate")?;
                 synth_options.phase_mod_rate_hz =
-                    parse_non_negative_f32(value, "phase modulation rate")?;
+                    Some(parse_non_negative_f32(value, "phase modulation rate")?);
             }
             "--phase-mod-depth" => {
-                let value = flag_value(&remaining, &mut index, "--phase-mod-depth")?;
+                let value = flag_value(args, &mut index, "--phase-mod-depth")?;
                 synth_options.phase_mod_depth_radians =
-                    parse_non_negative_f32(value, "phase modulation depth")?;
+                    Some(parse_non_negative_f32(value, "phase modulation depth")?);
             }
             "--amp-tremolo-rate" => {
-                let value = flag_value(&remaining, &mut index, "--amp-tremolo-rate")?;
+                let value = flag_value(args, &mut index, "--amp-tremolo-rate")?;
                 synth_options.amp_tremolo_rate_hz =
-                    parse_non_negative_f32(value, "amplitude tremolo rate")?;
+                    Some(parse_non_negative_f32(value, "amplitude tremolo rate")?);
             }
             "--amp-tremolo-depth" => {
-                let value = flag_value(&remaining, &mut index, "--amp-tremolo-depth")?;
-                synth_options.amp_tremolo_depth =
-                    parse_inclusive_f32_range(value, "amplitude tremolo depth", 0.0, 1.0)?;
+                let value = flag_value(args, &mut index, "--amp-tremolo-depth")?;
+                synth_options.amp_tremolo_depth = Some(parse_inclusive_f32_range(
+                    value,
+                    "amplitude tremolo depth",
+                    0.0,
+                    1.0,
+                )?);
             }
             "--seed" => {
-                let value = flag_value(&remaining, &mut index, "--seed")?;
-                synth_options.seed = parse_u64(value, "seed")?;
+                let value = flag_value(args, &mut index, "--seed")?;
+                synth_options.seed = Some(parse_u64(value, "seed")?);
             }
             "--vibrato-rate" => {
-                let value = flag_value(&remaining, &mut index, "--vibrato-rate")?;
-                synth_options.vibrato_rate_hz = parse_non_negative_f32(value, "vibrato rate")?;
+                let value = flag_value(args, &mut index, "--vibrato-rate")?;
+                synth_options.vibrato_rate_hz =
+                    Some(parse_non_negative_f32(value, "vibrato rate")?);
             }
             "--vibrato-depth-cents" => {
-                let value = flag_value(&remaining, &mut index, "--vibrato-depth-cents")?;
+                let value = flag_value(args, &mut index, "--vibrato-depth-cents")?;
                 synth_options.vibrato_depth_cents =
-                    parse_non_negative_f32(value, "vibrato depth")?;
+                    Some(parse_non_negative_f32(value, "vibrato depth")?);
             }
             "--noise-depth" => {
-                let value = flag_value(&remaining, &mut index, "--noise-depth")?;
+                let value = flag_value(args, &mut index, "--noise-depth")?;
                 synth_options.noise_depth =
-                    parse_inclusive_f32_range(value, "noise depth", 0.0, 1.0)?;
+                    Some(parse_inclusive_f32_range(value, "noise depth", 0.0, 1.0)?);
+            }
+            "--progression" | "--progression-file" => {
+                return Err(RainbowError::usage(
+                    "progression flags are not allowed inside event arguments",
+                ));
             }
             flag if flag.starts_with("--") => {
                 return Err(RainbowError::usage(format!("unknown flag `{flag}`")));
@@ -136,53 +394,36 @@ where
         index += 1;
     }
 
-    let chord = match (notes, chord_name) {
-        (Some(notes), None) => Chord::parse_notes(&notes)?,
-        (None, Some(chord_name)) => Chord::parse_symbol_name(&chord_name)?,
+    let input_spec = match (notes, chord_name) {
+        (Some(notes), None) => Some(InputSpec::Notes(notes)),
+        (None, Some(chord_name)) => Some(InputSpec::Chord(chord_name)),
         (Some(_), Some(_)) => {
             return Err(RainbowError::usage(
                 "use exactly one of --notes or --chord",
             ));
         }
-        (None, None) => {
-            return Err(RainbowError::usage(
-                "missing required input; use exactly one of --notes or --chord",
-            ));
-        }
+        (None, None) => None,
     };
 
-    let duration = match (beats, seconds) {
-        (Some(beats), None) => Duration::from_secs_f64(beats as f64 * 60.0 / bpm as f64),
-        (None, Some(seconds)) => {
-            if bpm != DEFAULT_BPM {
-                return Err(RainbowError::usage(
-                    "--bpm may only be used together with --beats",
-                ));
-            }
+    if beats.is_some() && seconds.is_some() {
+        return Err(RainbowError::usage(
+            "use exactly one of --beats or --seconds",
+        ));
+    }
 
-            Duration::from_secs_f64(seconds)
-        }
-        (Some(_), Some(_)) => {
-            return Err(RainbowError::usage(
-                "use exactly one of --beats or --seconds",
-            ));
-        }
-        (None, None) => {
-            if bpm != DEFAULT_BPM {
-                return Err(RainbowError::usage(
-                    "--bpm may only be used together with --beats",
-                ));
-            }
+    if bpm.is_some() && seconds.is_some() {
+        return Err(RainbowError::usage(
+            "--bpm may only be used together with --beats",
+        ));
+    }
 
-            Duration::from_secs_f64(DEFAULT_SECONDS)
-        }
-    };
-
-    Ok(ParseOutcome::Run(CliCommand {
-        chord,
-        duration,
+    Ok(PartialCommand {
+        input_spec,
+        beats,
+        seconds,
+        bpm,
         synth_options,
-    }))
+    })
 }
 
 fn parse_positive_integer(input: &str, field_name: &str) -> Result<u32, RainbowError> {
@@ -298,6 +539,20 @@ fn flag_value<'a>(
     Ok(value)
 }
 
+fn raw_flag_value<'a>(
+    args: &'a [String],
+    index: &mut usize,
+    flag_name: &str,
+) -> Result<&'a str, RainbowError> {
+    let value_index = *index + 1;
+    let value = args
+        .get(value_index)
+        .ok_or_else(|| RainbowError::usage(format!("missing value for {flag_name}")))?;
+
+    *index = value_index;
+    Ok(value)
+}
+
 pub fn usage(program_name: &str) -> String {
     format!(
         "\
@@ -305,11 +560,16 @@ rainbow_harmony plays a note or chord using a flag-based CLI.
 
 Usage:
   {program_name} (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
+  {program_name} --progression '<event => event => event>'
+  {program_name} --progression-file <path>
   {program_name} --help
 
 Required:
   --notes <notes>      Explicit note list such as A4 or C4+E4+G4
   --chord <symbol>     Chord symbol such as Cmaj7, Cm7b5, or C/E
+  --progression <text> Inline progression with => separators and sticky settings
+  --progression-file <path>
+                       File containing a progression with => separators and sticky settings
 
 Chord Symbols:
   Triads:              C or Cmaj, Cm or Cmin, Caug or C+, Cdim or Co
@@ -342,11 +602,13 @@ Notes:
   - If neither --beats nor --seconds is provided, playback defaults to 2.0 seconds
   - Do not use --beats and --seconds together
   - Use exactly one of --notes or --chord
+  - Progressions cannot be combined with one-event flags at the top level
   - --bpm may only be used with --beats
   - Note letters A through G are accepted in either case
   - Sharps use # and flats use b, for example C#4 or Bb3
   - --notes requires octaves on every note segment
   - --chord accepts chord symbols such as Cm7, Cadd9, C7#5, or C/E
+  - In progressions, => separates events and omitted settings stay sticky
   - Octaves must be between 0 and 8
 "
     )
@@ -465,6 +727,43 @@ mod tests {
     }
 
     #[test]
+    fn parses_progression_with_sticky_settings() {
+        let outcome = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--progression".to_string(),
+            "--chord Cmaj7 --beats 2 --bpm 120 => --chord Cmin --beats 3".to_string(),
+        ])
+        .unwrap();
+
+        let ParseOutcome::RunProgression(commands) = outcome else {
+            panic!("expected progression outcome");
+        };
+
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].duration, Duration::from_secs_f64(1.0));
+        assert_eq!(commands[1].duration, Duration::from_secs_f64(1.5));
+        assert_eq!(commands[1].synth_options, SynthOptions::default());
+    }
+
+    #[test]
+    fn progression_defaults_to_two_seconds_when_no_duration_is_set() {
+        let outcome = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--progression".to_string(),
+            "--notes C4+E4+G4 => --notes D4+F4+A4".to_string(),
+        ])
+        .unwrap();
+
+        let ParseOutcome::RunProgression(commands) = outcome else {
+            panic!("expected progression outcome");
+        };
+
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
+        assert_eq!(commands[1].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
+    }
+
+    #[test]
     fn recognizes_help_flag() {
         let outcome =
             parse_args(vec!["rainbow_harmony".to_string(), "--help".to_string()]).unwrap();
@@ -527,6 +826,21 @@ mod tests {
         .to_string();
 
         assert!(error.contains("exactly one of --notes or --chord"));
+    }
+
+    #[test]
+    fn rejects_progression_with_other_event_flags() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--progression".to_string(),
+            "--chord Cmaj7".to_string(),
+            "--beats".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("--progression cannot be combined"));
     }
 
     #[test]
