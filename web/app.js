@@ -24,13 +24,18 @@ const vibratoDepthValueEl = document.getElementById("vibratoDepthValue");
 const noiseDepthValueEl = document.getElementById("noiseDepthValue");
 const seedValueEl = document.getElementById("seedValue");
 const eventInputEl = document.getElementById("eventInput");
+const stickyPreviewEl = document.getElementById("stickyPreview");
 const progressionInputEl = document.getElementById("progressionInput");
+const progressionSummaryEl = document.getElementById("progressionSummary");
 const sampleRateEl = document.getElementById("sampleRate");
 const progressionModeEl = document.getElementById("progressionMode");
 const gapMsEl = document.getElementById("gapMs");
 const legatoMsEl = document.getElementById("legatoMs");
 const renderPlayButtonEl = document.getElementById("renderPlayButton");
 const stopButtonEl = document.getElementById("stopButton");
+const appendFullStepButtonEl = document.getElementById("appendFullStepButton");
+const appendStickyStepButtonEl = document.getElementById("appendStickyStepButton");
+const clearProgressionButtonEl = document.getElementById("clearProgressionButton");
 const statusEl = document.getElementById("status");
 const renderStatsEl = document.getElementById("renderStats");
 const waveformCanvasEl = document.getElementById("waveformCanvas");
@@ -169,9 +174,132 @@ function updateEventPreview() {
     updateDurationFieldState();
     eventInputEl.value = buildEventFlagsFromControls();
     eventInputEl.classList.remove("invalid");
+    updateProgressionBuilderState();
   } catch {
     eventInputEl.classList.add("invalid");
   }
+}
+
+function tokenizeFlags(text) {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function eventFlagsToMap(text) {
+  const tokens = tokenizeFlags(text);
+  const map = new Map();
+
+  for (let index = 0; index < tokens.length; index += 2) {
+    const flag = tokens[index];
+    const value = tokens[index + 1];
+    if (!flag || !flag.startsWith("--") || value === undefined) {
+      break;
+    }
+    map.set(flag, value);
+  }
+
+  return map;
+}
+
+function progressionSegments() {
+  return progressionInputEl.value
+    .split("=>")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function effectiveProgressionState() {
+  const state = new Map();
+  for (const segment of progressionSegments()) {
+    const segmentMap = eventFlagsToMap(segment);
+    for (const [flag, value] of segmentMap.entries()) {
+      state.set(flag, value);
+    }
+  }
+  return state;
+}
+
+function removeFlagPair(parts, flag) {
+  const index = parts.indexOf(flag);
+  if (index >= 0) {
+    parts.splice(index, 2);
+  }
+}
+
+function stickyFlagsForCurrentEvent() {
+  const current = eventFlagsToMap(eventInputEl.value);
+  const previous = effectiveProgressionState();
+  const sticky = [];
+
+  const inputFlag = current.has("--notes") ? "--notes" : "--chord";
+  sticky.push(inputFlag, current.get(inputFlag));
+
+  if (current.has("--seconds")) {
+    sticky.push("--seconds", current.get("--seconds"));
+  } else {
+    sticky.push("--beats", current.get("--beats"));
+    sticky.push("--bpm", current.get("--bpm"));
+  }
+
+  for (const [flag, value] of current.entries()) {
+    if (
+      flag === "--notes" ||
+      flag === "--chord" ||
+      flag === "--beats" ||
+      flag === "--bpm" ||
+      flag === "--seconds"
+    ) {
+      continue;
+    }
+
+    if (previous.get(flag) !== value) {
+      sticky.push(flag, value);
+    }
+  }
+
+  if (previous.get(inputFlag) === current.get(inputFlag)) {
+    removeFlagPair(sticky, inputFlag);
+  }
+
+  if (current.has("--seconds") && previous.get("--seconds") === current.get("--seconds")) {
+    removeFlagPair(sticky, "--seconds");
+  }
+
+  if (current.has("--beats")) {
+    if (previous.get("--beats") === current.get("--beats")) {
+      removeFlagPair(sticky, "--beats");
+    }
+    if (previous.get("--bpm") === current.get("--bpm")) {
+      removeFlagPair(sticky, "--bpm");
+    }
+  }
+
+  return sticky.join(" ").trim();
+}
+
+function appendSegment(segment) {
+  const trimmed = segment.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  progressionInputEl.value = progressionSegments().length
+    ? `${progressionInputEl.value.trim()} => ${trimmed}`
+    : trimmed;
+  updateProgressionBuilderState();
+}
+
+function updateProgressionBuilderState() {
+  const stickyFlags = stickyFlagsForCurrentEvent();
+  stickyPreviewEl.value = stickyFlags || eventInputEl.value.trim();
+
+  const segmentCount = progressionSegments().length;
+  progressionSummaryEl.textContent =
+    segmentCount === 0
+      ? "No progression steps yet."
+      : `${segmentCount} step${segmentCount === 1 ? "" : "s"} in progression.`;
 }
 
 function renderCurrentSelection() {
@@ -306,13 +434,15 @@ stopButtonEl.addEventListener("click", () => {
 
 modeEl.addEventListener("change", () => {
   const progressionMode = modeEl.value === "progression";
-  eventBuilderEl.hidden = progressionMode;
   progressionPanelEl.hidden = !progressionMode;
   progressionInputEl.disabled = !progressionMode;
   progressionModeEl.disabled = !progressionMode;
   gapMsEl.disabled = !progressionMode;
   legatoMsEl.disabled = !progressionMode;
-  eventInputEl.disabled = progressionMode;
+  appendFullStepButtonEl.disabled = !progressionMode;
+  appendStickyStepButtonEl.disabled = !progressionMode;
+  clearProgressionButtonEl.disabled = !progressionMode;
+  stickyPreviewEl.disabled = !progressionMode;
 });
 
 for (const field of builderFields) {
@@ -320,11 +450,27 @@ for (const field of builderFields) {
   field.addEventListener("change", updateEventPreview);
 }
 
+progressionInputEl.addEventListener("input", updateProgressionBuilderState);
+
+appendFullStepButtonEl.addEventListener("click", () => {
+  appendSegment(eventInputEl.value);
+});
+
+appendStickyStepButtonEl.addEventListener("click", () => {
+  appendSegment(stickyPreviewEl.value);
+});
+
+clearProgressionButtonEl.addEventListener("click", () => {
+  progressionInputEl.value = "";
+  updateProgressionBuilderState();
+});
+
 async function bootstrap() {
   try {
     await init();
     wasmReady = true;
     updateEventPreview();
+    updateProgressionBuilderState();
     drawWaveform([]);
     modeEl.dispatchEvent(new Event("change"));
     setStatus("Wasm package loaded. Ready to render.");

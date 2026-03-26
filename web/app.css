@@ -143,6 +143,12 @@ textarea.invalid {
   gap: 12px;
 }
 
+.builder-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .scope-panel {
   margin-top: 18px;
   padding: 18px;
@@ -219,6 +225,10 @@ button.secondary {
   }
 
   .actions {
+    flex-direction: column;
+  }
+
+  .builder-actions {
     flex-direction: column;
   }
 

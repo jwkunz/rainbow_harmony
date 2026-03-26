@@ -118,10 +118,23 @@
         <section id="progressionPanel" class="subpanel">
           <h2>Progression Editor</h2>
 
+          <div class="builder-actions">
+            <button id="appendFullStepButton" type="button">Append Full Step</button>
+            <button id="appendStickyStepButton" type="button">Append Sticky Step</button>
+            <button id="clearProgressionButton" type="button" class="secondary">Clear</button>
+          </div>
+
+          <div class="mode-row">
+            <label for="stickyPreview">Next sticky step preview</label>
+            <textarea id="stickyPreview" rows="3" readonly></textarea>
+          </div>
+
           <div class="mode-row">
             <label for="progressionInput">Progression text</label>
             <textarea id="progressionInput" rows="6">--chord Cmaj7 --beats 2 --bpm 120 => --chord Am7 => --chord Dm7 => --chord G7</textarea>
           </div>
+
+          <p id="progressionSummary" class="muted"></p>
         </section>
 
         <div class="grid">
