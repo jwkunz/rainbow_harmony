@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 
+use rainbow_harmony_core::describe::format_event_description;
 use rainbow_harmony_core::error::RainbowError;
 use rainbow_harmony_core::progression::{
     ProgressionMode, ProgressionPlaybackOptions, parse_progression_text, parse_single_event_args,
@@ -53,6 +54,13 @@ pub fn render_event_args(args_text: &str, sample_rate: u32) -> Result<RenderResu
 }
 
 #[wasm_bindgen]
+pub fn describe_event_args(args_text: &str) -> Result<String, JsValue> {
+    let args = tokenize_args(args_text);
+    let event = parse_single_event_args(&args).map_err(js_error)?;
+    Ok(format_event_description(&event))
+}
+
+#[wasm_bindgen]
 pub fn render_progression(
     progression_text: &str,
     sample_rate: u32,
@@ -97,7 +105,7 @@ fn js_error(error: RainbowError) -> JsValue {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_event_args, render_progression};
+    use super::{describe_event_args, render_event_args, render_progression};
 
     #[test]
     fn renders_single_event_from_flag_text() {
@@ -119,5 +127,12 @@ mod tests {
 
         assert!(!result.samples().is_empty());
         assert_eq!(result.sample_rate(), 48_000);
+    }
+
+    #[test]
+    fn describes_single_event_from_flag_text() {
+        let result = describe_event_args("--chord Cmaj7 --seconds 0.1").unwrap();
+        assert!(result.contains("notes:"));
+        assert!(result.contains("frequencies_hz:"));
     }
 }

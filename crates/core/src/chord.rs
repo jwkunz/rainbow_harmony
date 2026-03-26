@@ -1,5 +1,5 @@
 use crate::error::RainbowError;
-use crate::note::Note;
+use crate::note::{Accidental, Note};
 
 const ROOT_OCTAVE_MIDI_OFFSET: i32 = 60;
 const BASS_OCTAVE_MIDI_OFFSET: i32 = 48;
@@ -48,6 +48,8 @@ enum Alteration {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PitchClass {
+    letter: char,
+    accidental: i32,
     semitone: i32,
 }
 
@@ -90,6 +92,8 @@ impl PitchClass {
 
         Ok((
             Self {
+                letter,
+                accidental,
                 semitone: (base + accidental).rem_euclid(12),
             },
             consumed,
@@ -194,39 +198,43 @@ impl ChordSymbol {
         let (root, root_len) = PitchClass::parse(head)?;
         let mut suffix = &head[root_len..];
 
-        let quality = if suffix.starts_with("sus2") {
-            suffix = &suffix[4..];
-            ChordQuality::Suspended2
-        } else if suffix.starts_with("sus4") {
-            suffix = &suffix[4..];
-            ChordQuality::Suspended4
-        } else if suffix.starts_with("sus") {
-            suffix = &suffix[3..];
-            ChordQuality::Suspended4
-        } else if suffix.starts_with("maj") {
-            suffix = &suffix[3..];
-            ChordQuality::Major
-        } else if suffix.starts_with("min") {
-            suffix = &suffix[3..];
-            ChordQuality::Minor
-        } else if suffix.starts_with('m') {
-            suffix = &suffix[1..];
-            ChordQuality::Minor
-        } else if suffix.starts_with("aug") {
-            suffix = &suffix[3..];
-            ChordQuality::Augmented
-        } else if suffix.starts_with('+') {
-            suffix = &suffix[1..];
-            ChordQuality::Augmented
-        } else if suffix.starts_with("dim") {
-            suffix = &suffix[3..];
-            ChordQuality::Diminished
-        } else if suffix.starts_with('o') {
-            suffix = &suffix[1..];
-            ChordQuality::Diminished
-        } else {
-            ChordQuality::Major
-        };
+        let quality =
+            if suffix.starts_with("maj7") || suffix.starts_with("Maj7") || suffix.starts_with("M7")
+            {
+                ChordQuality::Major
+            } else if suffix.starts_with("sus2") {
+                suffix = &suffix[4..];
+                ChordQuality::Suspended2
+            } else if suffix.starts_with("sus4") {
+                suffix = &suffix[4..];
+                ChordQuality::Suspended4
+            } else if suffix.starts_with("sus") {
+                suffix = &suffix[3..];
+                ChordQuality::Suspended4
+            } else if suffix.starts_with("maj") {
+                suffix = &suffix[3..];
+                ChordQuality::Major
+            } else if suffix.starts_with("min") {
+                suffix = &suffix[3..];
+                ChordQuality::Minor
+            } else if suffix.starts_with('m') {
+                suffix = &suffix[1..];
+                ChordQuality::Minor
+            } else if suffix.starts_with("aug") {
+                suffix = &suffix[3..];
+                ChordQuality::Augmented
+            } else if suffix.starts_with('+') {
+                suffix = &suffix[1..];
+                ChordQuality::Augmented
+            } else if suffix.starts_with("dim") {
+                suffix = &suffix[3..];
+                ChordQuality::Diminished
+            } else if suffix.starts_with('o') {
+                suffix = &suffix[1..];
+                ChordQuality::Diminished
+            } else {
+                ChordQuality::Major
+            };
 
         let (extension, consumed_extension) = parse_extension(suffix, quality)?;
         suffix = &suffix[consumed_extension..];
@@ -297,15 +305,15 @@ impl ChordSymbol {
 
         let mut notes = Vec::new();
         if let Some(bass) = self.bass {
-            notes.push(Note::from_midi_note(
+            notes.push(spelled_note_from_pitch_class(
+                bass,
                 BASS_OCTAVE_MIDI_OFFSET + bass.semitone,
             )?);
         }
 
         for interval in intervals {
-            notes.push(Note::from_midi_note(
-                ROOT_OCTAVE_MIDI_OFFSET + self.root.semitone + interval,
-            )?);
+            let midi_note = ROOT_OCTAVE_MIDI_OFFSET + self.root.semitone + interval;
+            notes.push(spelled_note_from_interval(self.root, interval, midi_note)?);
         }
 
         Ok(notes)
@@ -453,6 +461,116 @@ fn replace_interval(intervals: &mut Vec<i32>, from: i32, to: i32) {
     }
 }
 
+fn spelled_note_from_pitch_class(
+    pitch_class: PitchClass,
+    midi_note: i32,
+) -> Result<Note, RainbowError> {
+    let accidental = match pitch_class.accidental {
+        -1 => Accidental::Flat,
+        0 => Accidental::Natural,
+        1 => Accidental::Sharp,
+        _ => return Note::from_midi_note(midi_note),
+    };
+
+    let pitch_class_value = natural_pitch_class(pitch_class.letter) + pitch_class.accidental;
+    let octave = ((midi_note - pitch_class_value) / 12) - 1;
+    if octave < 0 {
+        return Note::from_midi_note(midi_note);
+    }
+
+    Note::from_parts(pitch_class.letter, accidental, octave as u8)
+}
+
+fn spelled_note_from_interval(
+    root: PitchClass,
+    interval: i32,
+    midi_note: i32,
+) -> Result<Note, RainbowError> {
+    let Some(degree_steps) = interval_spelling(interval) else {
+        return Note::from_midi_note(midi_note);
+    };
+
+    let letter = letter_at_degree(root.letter, degree_steps);
+    let accidental_value = accidental_for_spelled_interval(root, degree_steps, interval)?;
+
+    let accidental = match accidental_value {
+        -1 => Accidental::Flat,
+        0 => Accidental::Natural,
+        1 => Accidental::Sharp,
+        _ => return Note::from_midi_note(midi_note),
+    };
+
+    let pitch_class = natural_pitch_class(letter) + accidental_value;
+    let octave = ((midi_note - pitch_class) / 12) - 1;
+    if octave < 0 {
+        return Note::from_midi_note(midi_note);
+    }
+
+    Note::from_parts(letter, accidental, octave as u8)
+}
+
+fn interval_spelling(interval: i32) -> Option<usize> {
+    match interval {
+        0 => Some(0),
+        2 => Some(1),
+        3 => Some(2),
+        4 => Some(2),
+        5 => Some(3),
+        6 => Some(4),
+        7 => Some(4),
+        8 => Some(4),
+        9 => Some(5),
+        10 => Some(6),
+        11 => Some(6),
+        13 => Some(1),
+        14 => Some(1),
+        15 => Some(1),
+        17 => Some(3),
+        18 => Some(3),
+        20 => Some(5),
+        21 => Some(5),
+        _ => None,
+    }
+}
+
+fn accidental_for_spelled_interval(
+    root: PitchClass,
+    degree_steps: usize,
+    interval: i32,
+) -> Result<i32, RainbowError> {
+    let target_letter = letter_at_degree(root.letter, degree_steps);
+    let target_pc = (root.semitone + interval).rem_euclid(12);
+    let shift = (target_pc - natural_pitch_class(target_letter)).rem_euclid(12);
+    match shift {
+        0 => Ok(0),
+        1 => Ok(1),
+        11 => Ok(-1),
+        _ => Err(RainbowError::usage("unsupported enharmonic spelling")),
+    }
+}
+
+fn letter_at_degree(root_letter: char, degree_steps: usize) -> char {
+    const LETTERS: [char; 7] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    let root_index = LETTERS
+        .iter()
+        .position(|letter| *letter == root_letter)
+        .expect("validated root letter");
+    LETTERS[(root_index + degree_steps) % LETTERS.len()]
+}
+
+fn natural_pitch_class(letter: char) -> i32 {
+    match letter {
+        'C' => 0,
+        'D' => 2,
+        'E' => 4,
+        'F' => 5,
+        'G' => 7,
+        'A' => 9,
+        'B' => 11,
+        _ => unreachable!("validated note letter"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Chord;
@@ -497,6 +615,27 @@ mod tests {
     fn parses_major_seventh_symbol() {
         let chord = Chord::parse("Cmaj7").unwrap();
         assert_eq!(chord.notes().len(), 4);
+        assert_eq!(
+            chord
+                .notes()
+                .iter()
+                .map(|note| note.to_string())
+                .collect::<Vec<_>>(),
+            vec!["C4", "E4", "G4", "B4"]
+        );
+    }
+
+    #[test]
+    fn spells_dominant_seventh_in_chord_context() {
+        let chord = Chord::parse_symbol_name("C7").unwrap();
+        assert_eq!(
+            chord
+                .notes()
+                .iter()
+                .map(|note| note.to_string())
+                .collect::<Vec<_>>(),
+            vec!["C4", "E4", "G4", "Bb4"]
+        );
     }
 
     #[test]

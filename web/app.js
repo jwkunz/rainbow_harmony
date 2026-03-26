@@ -1,4 +1,5 @@
 import init, {
+  describe_event_args,
   render_event_args,
   render_progression,
 } from "./pkg/rainbow_harmony_web_wasm.js";
@@ -26,6 +27,7 @@ const vibratoDepthValueEl = document.getElementById("vibratoDepthValue");
 const noiseDepthValueEl = document.getElementById("noiseDepthValue");
 const seedValueEl = document.getElementById("seedValue");
 const eventInputEl = document.getElementById("eventInput");
+const eventSpellingEl = document.getElementById("eventSpelling");
 const stickyPreviewEl = document.getElementById("stickyPreview");
 const progressionInputEl = document.getElementById("progressionInput");
 const progressionSummaryEl = document.getElementById("progressionSummary");
@@ -540,14 +542,32 @@ function updateProgressionBuilderState() {
   renderTimeline();
 }
 
+function updateEventSpelling() {
+  const flags = eventInputEl.value.trim();
+  if (!flags) {
+    eventSpellingEl.textContent =
+      "Type a note list or chord symbol to see its resolved notes.";
+    return;
+  }
+
+  try {
+    eventSpellingEl.textContent = describe_event_args(flags);
+  } catch (error) {
+    eventSpellingEl.textContent =
+      error instanceof Error ? error.message : String(error);
+  }
+}
+
 function updateEventPreview() {
   try {
     updateDurationFieldState();
     eventInputEl.value = buildEventFlagsFromControls();
     eventInputEl.classList.remove("invalid");
+    updateEventSpelling();
     updateProgressionBuilderState();
   } catch {
     eventInputEl.classList.add("invalid");
+    eventSpellingEl.textContent = "Invalid event input.";
   }
 }
 

@@ -162,6 +162,31 @@ textarea.invalid {
   margin: 0;
 }
 
+.spelling-panel {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 42, 33, 0.08);
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.spelling-label {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.spelling-output {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Courier New", monospace;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
 .scope-panel {
   margin-top: 18px;
   padding: 18px;

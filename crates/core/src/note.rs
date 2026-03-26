@@ -20,6 +20,33 @@ pub struct Note {
 }
 
 impl Note {
+    pub fn from_parts(
+        letter: char,
+        accidental: Accidental,
+        octave: u8,
+    ) -> Result<Self, RainbowError> {
+        let letter = letter.to_ascii_uppercase();
+        if !matches!(letter, 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G') {
+            return Err(RainbowError::usage(format!(
+                "invalid note letter `{}`; expected A through G",
+                letter
+            )));
+        }
+
+        if !(MIN_OCTAVE..=MAX_OCTAVE).contains(&octave) {
+            return Err(RainbowError::usage(format!(
+                "octave out of range; expected {} through {}",
+                MIN_OCTAVE, MAX_OCTAVE
+            )));
+        }
+
+        Ok(Self {
+            letter,
+            accidental,
+            octave,
+        })
+    }
+
     pub fn parse(input: &str) -> Result<Self, RainbowError> {
         let normalized = input.trim();
         if normalized.is_empty() {
@@ -73,11 +100,7 @@ impl Note {
             )));
         }
 
-        Ok(Self {
-            letter,
-            accidental,
-            octave,
-        })
+        Self::from_parts(letter, accidental, octave)
     }
 
     pub fn frequency_hz(self) -> f32 {
@@ -130,11 +153,7 @@ impl Note {
             _ => unreachable!("pitch class is modulo 12"),
         };
 
-        Ok(Self {
-            letter,
-            accidental,
-            octave: octave as u8,
-        })
+        Self::from_parts(letter, accidental, octave as u8)
     }
 }
 
