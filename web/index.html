@@ -26,6 +26,26 @@
           </select>
         </div>
 
+        <section class="subpanel">
+          <h2>Presets</h2>
+          <div class="preset-row">
+            <label class="preset-name">
+              Preset name
+              <input id="presetName" type="text" value="Warm Pad" />
+            </label>
+            <button id="savePresetButton" type="button">Save Preset</button>
+          </div>
+          <div class="preset-row">
+            <label class="preset-list">
+              Saved presets
+              <select id="presetSelect"></select>
+            </label>
+            <button id="loadPresetButton" type="button">Load</button>
+            <button id="deletePresetButton" type="button" class="secondary">Delete</button>
+          </div>
+          <p id="presetStatus" class="muted"></p>
+        </section>
+
         <section id="eventBuilder" class="subpanel">
           <h2>Single Event Builder</h2>
 
@@ -135,6 +155,8 @@
           </div>
 
           <p id="progressionSummary" class="muted"></p>
+
+          <div id="timelineList" class="timeline-list"></div>
         </section>
 
         <div class="grid">
@@ -161,6 +183,7 @@
 
         <div class="actions">
           <button id="renderPlayButton" type="button">Render and Play</button>
+          <button id="exportWavButton" type="button">Export WAV</button>
           <button id="stopButton" type="button" class="secondary">Stop</button>
         </div>
 
