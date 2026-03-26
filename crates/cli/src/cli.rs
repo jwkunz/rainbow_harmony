@@ -4,11 +4,21 @@ pub use rainbow_harmony_core::progression::{
     ProgressionPlaybackOptions, parse_progression_text, parse_single_event_args,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExecutionOptions {
+    pub describe: bool,
+    pub silent: bool,
+}
+
 #[derive(Debug)]
 pub enum ParseOutcome {
-    Run(CliCommand),
-    RunProgression(Vec<CliCommand>, ProgressionPlaybackOptions),
-    RunProgressionFile(String, ProgressionPlaybackOptions),
+    Run(CliCommand, ExecutionOptions),
+    RunProgression(
+        Vec<CliCommand>,
+        ProgressionPlaybackOptions,
+        ExecutionOptions,
+    ),
+    RunProgressionFile(String, ProgressionPlaybackOptions, ExecutionOptions),
     Help,
 }
 
@@ -33,6 +43,7 @@ where
     let mut progression = None::<String>;
     let mut progression_file = None::<String>;
     let mut progression_options = ProgressionPlaybackOptions::default();
+    let mut execution_options = ExecutionOptions::default();
     let mut saw_non_progression_flag = false;
     let mut saw_progression_option = false;
     let mut index = 0;
@@ -61,9 +72,17 @@ where
                 progression_options.legato_ms = parse_non_negative_u32(value, "legato")?;
                 saw_progression_option = true;
             }
+            "--describe" => {
+                execution_options.describe = true;
+            }
+            "--silent" => {
+                execution_options.silent = true;
+            }
             "--help" | "-h" => {}
             flag if flag.starts_with("--") => {
-                saw_non_progression_flag = true;
+                if flag != "--describe" && flag != "--silent" {
+                    saw_non_progression_flag = true;
+                }
             }
             _ => {}
         }
@@ -86,6 +105,7 @@ where
             return Ok(ParseOutcome::RunProgression(
                 parse_progression_text(&text)?,
                 progression_options,
+                execution_options,
             ));
         }
         (None, Some(path)) => {
@@ -94,7 +114,11 @@ where
                     "--progression-file cannot be combined with other event flags",
                 ));
             }
-            return Ok(ParseOutcome::RunProgressionFile(path, progression_options));
+            return Ok(ParseOutcome::RunProgressionFile(
+                path,
+                progression_options,
+                execution_options,
+            ));
         }
         (None, None) => {
             if saw_progression_option {
@@ -105,7 +129,15 @@ where
         }
     }
 
-    Ok(ParseOutcome::Run(parse_single_event_args(&remaining)?))
+    let filtered = remaining
+        .into_iter()
+        .filter(|arg| arg != "--describe" && arg != "--silent")
+        .collect::<Vec<_>>();
+
+    Ok(ParseOutcome::Run(
+        parse_single_event_args(&filtered)?,
+        execution_options,
+    ))
 }
 
 fn parse_non_negative_u32(input: &str, field_name: &str) -> Result<u32, RainbowError> {
@@ -207,6 +239,8 @@ Synthesis:
   --vibrato-depth-cents <cents>        Vibrato depth in cents, default 0.25
   --noise-depth <depth>                White noise depth from 0.0 to 1.0, default 0.02
   --seed <integer>                     Seed for reproducible phase variation, default 0
+  --describe                           Print the resolved notes and frequencies
+  --silent                             Do not play audio; useful with --describe
 
 Notes:
   - This CLI no longer accepts positional arguments
@@ -219,6 +253,8 @@ Notes:
   - Sharps use # and flats use b, for example C#4 or Bb3
   - --notes requires octaves on every note segment
   - --chord accepts chord symbols such as Cm7, Cadd9, C7#5, or C/E
+  - --describe works for both single events and progressions
+  - --silent suppresses playback and can be combined with --describe for spelling only
   - In progressions, => separates events and omitted settings stay sticky
   - stitched pre-renders the full progression into one buffer for smoother playback
   - separate plays each event individually and preserves audible boundaries
@@ -234,7 +270,8 @@ mod tests {
     use rainbow_harmony_core::synth::SynthOptions;
 
     use super::{
-        DEFAULT_SECONDS, ParseOutcome, ProgressionMode, ProgressionPlaybackOptions, parse_args,
+        DEFAULT_SECONDS, ExecutionOptions, ParseOutcome, ProgressionMode,
+        ProgressionPlaybackOptions, parse_args,
     };
 
     #[test]
@@ -250,13 +287,14 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::Run(command) = outcome else {
+        let ParseOutcome::Run(command, execution) = outcome else {
             panic!("expected run outcome");
         };
 
         assert_eq!(command.chord.notes().len(), 2);
         assert_eq!(command.duration, Duration::from_secs_f64(2.0 * 60.0 / 90.0));
         assert_eq!(command.synth_options, SynthOptions::default());
+        assert_eq!(execution, ExecutionOptions::default());
     }
 
     #[test]
@@ -270,7 +308,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::Run(command) = outcome else {
+        let ParseOutcome::Run(command, _) = outcome else {
             panic!("expected run outcome");
         };
 
@@ -286,7 +324,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::Run(command) = outcome else {
+        let ParseOutcome::Run(command, _) = outcome else {
             panic!("expected run outcome");
         };
 
@@ -326,7 +364,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::Run(command) = outcome else {
+        let ParseOutcome::Run(command, _) = outcome else {
             panic!("expected run outcome");
         };
 
@@ -352,7 +390,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::RunProgression(commands, options) = outcome else {
+        let ParseOutcome::RunProgression(commands, options, execution) = outcome else {
             panic!("expected progression outcome");
         };
 
@@ -361,6 +399,7 @@ mod tests {
         assert_eq!(commands[1].duration, Duration::from_secs_f64(1.5));
         assert_eq!(commands[1].synth_options, SynthOptions::default());
         assert_eq!(options, ProgressionPlaybackOptions::default());
+        assert_eq!(execution, ExecutionOptions::default());
     }
 
     #[test]
@@ -372,7 +411,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::RunProgression(commands, _) = outcome else {
+        let ParseOutcome::RunProgression(commands, _, _) = outcome else {
             panic!("expected progression outcome");
         };
 
@@ -402,7 +441,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::RunProgression(_, options) = outcome else {
+        let ParseOutcome::RunProgression(_, options, _) = outcome else {
             panic!("expected progression outcome");
         };
 
@@ -421,6 +460,25 @@ mod tests {
         let outcome =
             parse_args(vec!["rainbow_harmony".to_string(), "--help".to_string()]).unwrap();
         assert!(matches!(outcome, ParseOutcome::Help));
+    }
+
+    #[test]
+    fn parses_describe_and_silent_flags() {
+        let outcome = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--describe".to_string(),
+            "--silent".to_string(),
+            "--chord".to_string(),
+            "Cmaj7".to_string(),
+        ])
+        .unwrap();
+
+        let ParseOutcome::Run(_, execution) = outcome else {
+            panic!("expected run outcome");
+        };
+
+        assert!(execution.describe);
+        assert!(execution.silent);
     }
 
     #[test]

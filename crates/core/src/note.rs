@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use crate::error::RainbowError;
 
 const MIN_OCTAVE: u8 = 0;
@@ -133,6 +135,18 @@ impl Note {
             accidental,
             octave: octave as u8,
         })
+    }
+}
+
+impl Display for Note {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let accidental = match self.accidental {
+            Accidental::Natural => "",
+            Accidental::Sharp => "#",
+            Accidental::Flat => "b",
+        };
+
+        write!(f, "{}{}{}", self.letter, accidental, self.octave)
     }
 }
 

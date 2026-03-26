@@ -9,6 +9,7 @@ You give it:
 - either a duration in beats via `--beats` with optional `--bpm`
 - or an absolute duration via `--seconds`
 - optional synthesis controls such as `--gain`, `--harmonics`, phase modulation, vibrato, tremolo, white noise, and `--seed`
+- optional spelling output via `--describe`, with `--silent` for non-playback inspection
 
 It generates the waveform in-process, adds a short fade-in and fade-out to reduce clicks, and blocks until playback finishes.
 
@@ -65,6 +66,7 @@ rainbow_harmony --notes A4 --seconds 1.5
 rainbow_harmony --notes A4
 rainbow_harmony --progression '--chord Cmaj7 --beats 2 --bpm 120 => --chord Cmin --beats 3'
 rainbow_harmony --notes A4 --seconds 2.0 --harmonics 12 --amp-tremolo-depth 0.2
+rainbow_harmony --describe --silent --chord Cmaj7
 ```
 
 Help:
@@ -224,6 +226,8 @@ rainbow_harmony --progression \
 - `--vibrato-depth-cents <cents>` sets vibrato depth in cents, default `0.25`
 - `--noise-depth <depth>` sets white noise depth from `0.0` to `1.0`, default `0.02`
 - `--seed <integer>` sets a deterministic seed for reproducible phase variation
+- `--describe` prints the resolved notes and frequencies for the generated event or progression
+- `--silent` suppresses playback and is useful with `--describe` when using the CLI as a chord speller
 
 Example:
 
