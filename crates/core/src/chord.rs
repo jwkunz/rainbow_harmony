@@ -297,7 +297,9 @@ impl ChordSymbol {
 
         let mut notes = Vec::new();
         if let Some(bass) = self.bass {
-            notes.push(Note::from_midi_note(BASS_OCTAVE_MIDI_OFFSET + bass.semitone)?);
+            notes.push(Note::from_midi_note(
+                BASS_OCTAVE_MIDI_OFFSET + bass.semitone,
+            )?);
         }
 
         for interval in intervals {
@@ -357,7 +359,11 @@ fn base_intervals(quality: ChordQuality) -> Vec<i32> {
     }
 }
 
-fn apply_extension(intervals: &mut Vec<i32>, quality: ChordQuality, extension: Option<ExtensionKind>) {
+fn apply_extension(
+    intervals: &mut Vec<i32>,
+    quality: ChordQuality,
+    extension: Option<ExtensionKind>,
+) {
     let Some(extension) = extension else {
         return;
     };
@@ -368,20 +374,32 @@ fn apply_extension(intervals: &mut Vec<i32>, quality: ChordQuality, extension: O
         ExtensionKind::DominantSeventh => {
             add_interval(
                 intervals,
-                if quality == ChordQuality::Diminished { 9 } else { 10 },
+                if quality == ChordQuality::Diminished {
+                    9
+                } else {
+                    10
+                },
             );
         }
         ExtensionKind::Ninth => {
             add_interval(
                 intervals,
-                if quality == ChordQuality::Diminished { 9 } else { 10 },
+                if quality == ChordQuality::Diminished {
+                    9
+                } else {
+                    10
+                },
             );
             add_interval(intervals, 14);
         }
         ExtensionKind::Eleventh => {
             add_interval(
                 intervals,
-                if quality == ChordQuality::Diminished { 9 } else { 10 },
+                if quality == ChordQuality::Diminished {
+                    9
+                } else {
+                    10
+                },
             );
             add_interval(intervals, 14);
             add_interval(intervals, 17);
@@ -389,7 +407,11 @@ fn apply_extension(intervals: &mut Vec<i32>, quality: ChordQuality, extension: O
         ExtensionKind::Thirteenth => {
             add_interval(
                 intervals,
-                if quality == ChordQuality::Diminished { 9 } else { 10 },
+                if quality == ChordQuality::Diminished {
+                    9
+                } else {
+                    10
+                },
             );
             add_interval(intervals, 14);
             add_interval(intervals, 17);

@@ -377,8 +377,14 @@ mod tests {
         };
 
         assert_eq!(commands.len(), 2);
-        assert_eq!(commands[0].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
-        assert_eq!(commands[1].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
+        assert_eq!(
+            commands[0].duration,
+            Duration::from_secs_f64(DEFAULT_SECONDS)
+        );
+        assert_eq!(
+            commands[1].duration,
+            Duration::from_secs_f64(DEFAULT_SECONDS)
+        );
     }
 
     #[test]

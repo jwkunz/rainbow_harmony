@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::chord::Chord;
 use crate::error::RainbowError;
-use crate::synth::SynthOptions;
+use crate::synth::{SynthOptions, render_waveform};
 
 pub const DEFAULT_BPM: u32 = 120;
 pub const DEFAULT_SECONDS: f64 = 2.0;
@@ -162,6 +162,43 @@ pub fn parse_progression_text(text: &str) -> Result<Vec<PlaybackEvent>, RainbowE
     Ok(events)
 }
 
+pub fn render_progression_waveform(
+    events: &[PlaybackEvent],
+    sample_rate: u32,
+    options: ProgressionPlaybackOptions,
+) -> Vec<f32> {
+    let mut combined = Vec::new();
+    let gap_samples = millis_to_samples(options.gap_ms, sample_rate);
+    let legato_samples = millis_to_samples(options.legato_ms, sample_rate);
+
+    for event in events {
+        let next = render_waveform(
+            &event.chord,
+            event.duration,
+            sample_rate,
+            event.synth_options,
+        );
+
+        if combined.is_empty() {
+            combined = next;
+            continue;
+        }
+
+        let overlap_samples = legato_samples.saturating_sub(gap_samples);
+        let silence_samples = gap_samples.saturating_sub(legato_samples);
+
+        if overlap_samples > 0 {
+            let overlap = overlap_samples.min(combined.len()).min(next.len());
+            crossfade_append(&mut combined, &next, overlap);
+        } else {
+            combined.extend(std::iter::repeat_n(0.0_f32, silence_samples));
+            combined.extend(next);
+        }
+    }
+
+    combined
+}
+
 fn build_single_event(partial: PartialCommand) -> Result<PlaybackEvent, RainbowError> {
     let input_spec = partial.input_spec.ok_or_else(|| {
         RainbowError::usage("missing required input; use exactly one of --notes or --chord")
@@ -187,6 +224,26 @@ fn build_single_event(partial: PartialCommand) -> Result<PlaybackEvent, RainbowE
         &duration,
         merge_synth_options(SynthOptions::default(), partial.synth_options),
     )
+}
+
+fn millis_to_samples(millis: u32, sample_rate: u32) -> usize {
+    ((millis as u64 * sample_rate as u64) / 1000) as usize
+}
+
+fn crossfade_append(output: &mut Vec<f32>, next: &[f32], overlap: usize) {
+    if overlap == 0 {
+        output.extend_from_slice(next);
+        return;
+    }
+
+    let start = output.len() - overlap;
+    for index in 0..overlap {
+        let fade_out = 1.0 - index as f32 / overlap as f32;
+        let fade_in = index as f32 / overlap as f32;
+        output[start + index] = output[start + index] * fade_out + next[index] * fade_in;
+    }
+
+    output.extend_from_slice(&next[overlap..]);
 }
 
 fn build_event_from_state(
@@ -289,7 +346,8 @@ fn parse_partial_command_args(args: &[String]) -> Result<PartialCommand, Rainbow
             }
             "--harmonic-decay" => {
                 let value = flag_value(args, &mut index, "--harmonic-decay")?;
-                synth_options.harmonic_decay = Some(parse_non_negative_f32(value, "harmonic decay")?);
+                synth_options.harmonic_decay =
+                    Some(parse_non_negative_f32(value, "harmonic decay")?);
             }
             "--phase-mod-rate" => {
                 let value = flag_value(args, &mut index, "--phase-mod-rate")?;
@@ -334,10 +392,7 @@ fn parse_partial_command_args(args: &[String]) -> Result<PartialCommand, Rainbow
                 synth_options.noise_depth =
                     Some(parse_inclusive_f32_range(value, "noise depth", 0.0, 1.0)?);
             }
-            "--progression"
-            | "--progression-file"
-            | "--progression-mode"
-            | "--gap-ms"
+            "--progression" | "--progression-file" | "--progression-mode" | "--gap-ms"
             | "--legato-ms" => {
                 return Err(RainbowError::usage(
                     "progression flags are not allowed inside event arguments",
@@ -360,9 +415,7 @@ fn parse_partial_command_args(args: &[String]) -> Result<PartialCommand, Rainbow
         (Some(notes), None) => Some(InputSpec::Notes(notes)),
         (None, Some(chord_name)) => Some(InputSpec::Chord(chord_name)),
         (Some(_), Some(_)) => {
-            return Err(RainbowError::usage(
-                "use exactly one of --notes or --chord",
-            ));
+            return Err(RainbowError::usage("use exactly one of --notes or --chord"));
         }
         (None, None) => None,
     };
@@ -499,4 +552,220 @@ fn flag_value<'a>(
 
     *index = value_index;
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::chord::Chord;
+    use crate::synth::{SynthOptions, render_waveform};
+
+    use super::{
+        DEFAULT_BPM, DEFAULT_SECONDS, PlaybackEvent, ProgressionMode, ProgressionPlaybackOptions,
+        parse_progression_text, parse_single_event_args, render_progression_waveform,
+    };
+
+    #[test]
+    fn parses_valid_beat_arguments() {
+        let command = parse_single_event_args(&[
+            "--notes".to_string(),
+            "C4+E4".to_string(),
+            "--beats".to_string(),
+            "2".to_string(),
+            "--bpm".to_string(),
+            "90".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(command.chord.notes().len(), 2);
+        assert_eq!(command.duration, Duration::from_secs_f64(2.0 * 60.0 / 90.0));
+        assert_eq!(command.synth_options, SynthOptions::default());
+    }
+
+    #[test]
+    fn parses_seconds_arguments() {
+        let command = parse_single_event_args(&[
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--seconds".to_string(),
+            "1.5".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(command.duration, Duration::from_secs_f64(1.5));
+    }
+
+    #[test]
+    fn defaults_to_two_seconds_when_duration_is_omitted() {
+        let command = parse_single_event_args(&["--notes".to_string(), "A4".to_string()]).unwrap();
+
+        assert_eq!(command.duration, Duration::from_secs_f64(DEFAULT_SECONDS));
+    }
+
+    #[test]
+    fn parses_synthesis_flags() {
+        let command = parse_single_event_args(&[
+            "--chord".to_string(),
+            "A".to_string(),
+            "--seconds".to_string(),
+            "1.5".to_string(),
+            "--gain".to_string(),
+            "0.8".to_string(),
+            "--harmonics".to_string(),
+            "12".to_string(),
+            "--harmonic-decay".to_string(),
+            "0.2".to_string(),
+            "--phase-mod-rate".to_string(),
+            "0.5".to_string(),
+            "--phase-mod-depth".to_string(),
+            "1.57".to_string(),
+            "--amp-tremolo-rate".to_string(),
+            "2.0".to_string(),
+            "--amp-tremolo-depth".to_string(),
+            "0.25".to_string(),
+            "--vibrato-rate".to_string(),
+            "8.0".to_string(),
+            "--vibrato-depth-cents".to_string(),
+            "15.0".to_string(),
+            "--noise-depth".to_string(),
+            "0.05".to_string(),
+            "--seed".to_string(),
+            "42".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(command.synth_options.gain, 0.8);
+        assert_eq!(command.synth_options.harmonics, 12);
+        assert_eq!(command.synth_options.harmonic_decay, 0.2);
+        assert_eq!(command.synth_options.phase_mod_rate_hz, 0.5);
+        assert_eq!(command.synth_options.phase_mod_depth_radians, 1.57);
+        assert_eq!(command.synth_options.amp_tremolo_rate_hz, 2.0);
+        assert_eq!(command.synth_options.amp_tremolo_depth, 0.25);
+        assert_eq!(command.synth_options.vibrato_rate_hz, 8.0);
+        assert_eq!(command.synth_options.vibrato_depth_cents, 15.0);
+        assert_eq!(command.synth_options.noise_depth, 0.05);
+        assert_eq!(command.synth_options.seed, 42);
+    }
+
+    #[test]
+    fn parses_progression_with_sticky_settings() {
+        let events =
+            parse_progression_text("--chord Cmaj7 --beats 2 --bpm 120 => --chord Cmin --beats 3")
+                .unwrap();
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].duration, Duration::from_secs_f64(1.0));
+        assert_eq!(events[1].duration, Duration::from_secs_f64(1.5));
+    }
+
+    #[test]
+    fn progression_inherits_synth_settings() {
+        let events = parse_progression_text(
+            "--notes C4+E4+G4 --harmonics 16 --gain 0.5 => --notes D4+F4+A4",
+        )
+        .unwrap();
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].synth_options.harmonics, 16);
+        assert_eq!(events[1].synth_options.gain, 0.5);
+    }
+
+    #[test]
+    fn progression_renderer_appends_gap_samples() {
+        let events = vec![
+            PlaybackEvent {
+                chord: Chord::parse("A4").unwrap(),
+                duration: Duration::from_millis(100),
+                synth_options: SynthOptions::default(),
+            },
+            PlaybackEvent {
+                chord: Chord::parse("C5").unwrap(),
+                duration: Duration::from_millis(100),
+                synth_options: SynthOptions::default(),
+            },
+        ];
+        let sample_rate = 48_000;
+        let first = render_waveform(
+            &events[0].chord,
+            events[0].duration,
+            sample_rate,
+            events[0].synth_options,
+        );
+        let second = render_waveform(
+            &events[1].chord,
+            events[1].duration,
+            sample_rate,
+            events[1].synth_options,
+        );
+
+        let combined = render_progression_waveform(
+            &events,
+            sample_rate,
+            ProgressionPlaybackOptions {
+                mode: ProgressionMode::Stitched,
+                gap_ms: 25,
+                legato_ms: 0,
+            },
+        );
+
+        assert_eq!(combined.len(), first.len() + second.len() + 1_200);
+    }
+
+    #[test]
+    fn progression_renderer_shortens_output_when_legato_overlaps() {
+        let events = vec![
+            PlaybackEvent {
+                chord: Chord::parse("A4").unwrap(),
+                duration: Duration::from_millis(100),
+                synth_options: SynthOptions::default(),
+            },
+            PlaybackEvent {
+                chord: Chord::parse("C5").unwrap(),
+                duration: Duration::from_millis(100),
+                synth_options: SynthOptions::default(),
+            },
+        ];
+        let sample_rate = 48_000;
+        let first = render_waveform(
+            &events[0].chord,
+            events[0].duration,
+            sample_rate,
+            events[0].synth_options,
+        );
+        let second = render_waveform(
+            &events[1].chord,
+            events[1].duration,
+            sample_rate,
+            events[1].synth_options,
+        );
+
+        let combined = render_progression_waveform(
+            &events,
+            sample_rate,
+            ProgressionPlaybackOptions {
+                mode: ProgressionMode::Stitched,
+                gap_ms: 0,
+                legato_ms: 10,
+            },
+        );
+
+        assert_eq!(combined.len(), first.len() + second.len() - 480);
+    }
+
+    #[test]
+    fn bpm_defaults_to_standard_tempo() {
+        let command = parse_single_event_args(&[
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--beats".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            command.duration,
+            Duration::from_secs_f64(2.0 * 60.0 / DEFAULT_BPM as f64)
+        );
+    }
 }

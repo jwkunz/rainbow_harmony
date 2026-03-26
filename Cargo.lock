@@ -460,6 +460,14 @@ name = "rainbow_harmony_core"
 version = "0.1.0"
 
 [[package]]
+name = "rainbow_harmony_web_wasm"
+version = "0.1.0"
+dependencies = [
+ "rainbow_harmony_core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"

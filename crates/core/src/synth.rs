@@ -72,12 +72,12 @@ pub fn render_waveform(
                     * options.phase_mod_depth_radians
                     * (2.0 * PI * options.phase_mod_rate_hz * time).sin();
                 let amplitude_tremolo = 1.0
-                    + options.amp_tremolo_depth * (2.0 * PI * options.amp_tremolo_rate_hz * time).sin();
-                *sample +=
-                    options.gain
-                        * amplitude
-                        * amplitude_tremolo
-                        * (2.0 * PI * harmonic_frequency * time + phase + phase_mod).sin();
+                    + options.amp_tremolo_depth
+                        * (2.0 * PI * options.amp_tremolo_rate_hz * time).sin();
+                *sample += options.gain
+                    * amplitude
+                    * amplitude_tremolo
+                    * (2.0 * PI * harmonic_frequency * time + phase + phase_mod).sin();
             }
         }
     }

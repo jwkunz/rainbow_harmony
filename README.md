@@ -12,6 +12,12 @@ You give it:
 
 It generates the waveform in-process, adds a short fade-in and fade-out to reduce clicks, and blocks until playback finishes.
 
+The repository is organized as a Cargo workspace:
+
+- `crates/core` contains shared parsing, progression, and synthesis logic
+- `crates/cli` contains the native command-line frontend and audio playback
+- `crates/web_wasm` contains WebAssembly bindings over the shared render API
+
 ## Status
 
 The project currently targets local builds. GitHub release packaging for macOS, Linux, and Windows is planned for a later step.
@@ -258,6 +264,24 @@ Examples:
 Prerequisites:
 
 - Rust toolchain installed through `rustup`
+
+Build and test the entire workspace:
+
+```bash
+cargo test --workspace
+```
+
+Run the CLI frontend:
+
+```bash
+cargo run -p rainbow_harmony -- --notes A4 --seconds 2
+```
+
+Build the wasm bindings crate:
+
+```bash
+cargo build -p rainbow_harmony_web_wasm --target wasm32-unknown-unknown
+```
 - a working default audio output device
 - platform audio development libraries if your OS requires them for native builds
 
