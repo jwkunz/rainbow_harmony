@@ -26,15 +26,103 @@
           </select>
         </div>
 
-        <div class="mode-row">
-          <label for="eventInput">Event flags</label>
-          <textarea id="eventInput" rows="4">--chord Cmaj7 --beats 2 --bpm 120</textarea>
-        </div>
+        <section id="eventBuilder" class="subpanel">
+          <h2>Single Event Builder</h2>
 
-        <div class="mode-row">
-          <label for="progressionInput">Progression text</label>
-          <textarea id="progressionInput" rows="6">--chord Cmaj7 --beats 2 --bpm 120 => --chord Am7 => --chord Dm7 => --chord G7</textarea>
-        </div>
+          <div class="grid">
+            <label>
+              Event input type
+              <select id="eventInputType">
+                <option value="chord">Chord symbol</option>
+                <option value="notes">Explicit notes</option>
+              </select>
+            </label>
+            <label>
+              Value
+              <input id="eventValue" type="text" value="Cmaj7" />
+            </label>
+            <label>
+              Duration mode
+              <select id="durationMode">
+                <option value="beats">Beats</option>
+                <option value="seconds">Seconds</option>
+              </select>
+            </label>
+            <label>
+              Beats
+              <input id="beatsValue" type="number" min="1" step="1" value="2" />
+            </label>
+            <label>
+              BPM
+              <input id="bpmValue" type="number" min="1" step="1" value="120" />
+            </label>
+            <label>
+              Seconds
+              <input id="secondsValue" type="number" min="0.05" step="0.05" value="2.0" />
+            </label>
+          </div>
+
+          <div class="grid synth-grid">
+            <label>
+              Gain
+              <input id="gainValue" type="number" min="0.01" step="0.05" value="1.0" />
+            </label>
+            <label>
+              Harmonics
+              <input id="harmonicsValue" type="number" min="1" step="1" value="33" />
+            </label>
+            <label>
+              Harmonic decay
+              <input id="harmonicDecayValue" type="number" min="0" step="0.05" value="0.8" />
+            </label>
+            <label>
+              Phase mod rate
+              <input id="phaseModRateValue" type="number" min="0" step="0.1" value="1000" />
+            </label>
+            <label>
+              Phase mod depth
+              <input id="phaseModDepthValue" type="number" min="0" step="0.01" value="0.05" />
+            </label>
+            <label>
+              Amp tremolo rate
+              <input id="ampTremoloRateValue" type="number" min="0" step="0.1" value="3" />
+            </label>
+            <label>
+              Amp tremolo depth
+              <input id="ampTremoloDepthValue" type="number" min="0" max="1" step="0.01" value="0.05" />
+            </label>
+            <label>
+              Vibrato rate
+              <input id="vibratoRateValue" type="number" min="0" step="0.1" value="5" />
+            </label>
+            <label>
+              Vibrato depth cents
+              <input id="vibratoDepthValue" type="number" min="0" step="0.01" value="0.25" />
+            </label>
+            <label>
+              Noise depth
+              <input id="noiseDepthValue" type="number" min="0" max="1" step="0.01" value="0.02" />
+            </label>
+            <label>
+              Seed
+              <input id="seedValue" type="number" min="0" step="1" value="0" />
+            </label>
+          </div>
+
+          <div class="mode-row">
+            <label for="eventInput">Generated event flags</label>
+            <textarea id="eventInput" rows="4">--chord Cmaj7 --beats 2 --bpm 120 --gain 1 --harmonics 33 --harmonic-decay 0.8 --phase-mod-rate 1000 --phase-mod-depth 0.05 --amp-tremolo-rate 3 --amp-tremolo-depth 0.05 --vibrato-rate 5 --vibrato-depth-cents 0.25 --noise-depth 0.02 --seed 0</textarea>
+          </div>
+        </section>
+
+        <section id="progressionPanel" class="subpanel">
+          <h2>Progression Editor</h2>
+
+          <div class="mode-row">
+            <label for="progressionInput">Progression text</label>
+            <textarea id="progressionInput" rows="6">--chord Cmaj7 --beats 2 --bpm 120 => --chord Am7 => --chord Dm7 => --chord G7</textarea>
+          </div>
+        </section>
 
         <div class="grid">
           <label>
