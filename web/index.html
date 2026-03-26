@@ -151,6 +151,14 @@
           <button id="stopButton" type="button" class="secondary">Stop</button>
         </div>
 
+        <section class="scope-panel">
+          <div class="scope-header">
+            <h2>Waveform</h2>
+            <p class="muted">Preview of the rendered mono sample buffer.</p>
+          </div>
+          <canvas id="waveformCanvas" width="880" height="220"></canvas>
+        </section>
+
         <div class="status-panel">
           <p id="status">Wasm package not loaded yet.</p>
           <p id="renderStats" class="muted"></p>

@@ -33,10 +33,12 @@ const renderPlayButtonEl = document.getElementById("renderPlayButton");
 const stopButtonEl = document.getElementById("stopButton");
 const statusEl = document.getElementById("status");
 const renderStatsEl = document.getElementById("renderStats");
+const waveformCanvasEl = document.getElementById("waveformCanvas");
 
 let audioContext = null;
 let activeSource = null;
 let wasmReady = false;
+let lastRenderedSamples = [];
 
 const builderFields = [
   eventInputTypeEl,
@@ -188,6 +190,68 @@ function renderCurrentSelection() {
   );
 }
 
+function drawWaveform(samples) {
+  const context = waveformCanvasEl.getContext("2d");
+  const width = waveformCanvasEl.width;
+  const height = waveformCanvasEl.height;
+  const midline = height / 2;
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#fffaf2";
+  context.fillRect(0, 0, width, height);
+
+  context.strokeStyle = "rgba(31, 42, 33, 0.14)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(0, midline);
+  context.lineTo(width, midline);
+  context.stroke();
+
+  if (!samples.length) {
+    return;
+  }
+
+  const bucketSize = Math.max(1, Math.floor(samples.length / width));
+  context.strokeStyle = "#0f766e";
+  context.lineWidth = 1.5;
+  context.beginPath();
+
+  for (let x = 0; x < width; x += 1) {
+    const start = x * bucketSize;
+    const end = Math.min(samples.length, start + bucketSize);
+    let peak = 0;
+
+    for (let index = start; index < end; index += 1) {
+      peak = Math.max(peak, Math.abs(samples[index]));
+    }
+
+    const y = midline - peak * (height * 0.42);
+    if (x === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+
+  for (let x = width - 1; x >= 0; x -= 1) {
+    const start = x * bucketSize;
+    const end = Math.min(samples.length, start + bucketSize);
+    let trough = 0;
+
+    for (let index = start; index < end; index += 1) {
+      trough = Math.min(trough, samples[index]);
+    }
+
+    const y = midline - trough * (height * 0.42);
+    context.lineTo(x, y);
+  }
+
+  context.closePath();
+  context.fillStyle = "rgba(15, 118, 110, 0.16)";
+  context.fill();
+  context.stroke();
+}
+
 async function playCurrentSelection() {
   if (!wasmReady) {
     setStatus("Wasm package is still loading.", true);
@@ -202,6 +266,8 @@ async function playCurrentSelection() {
     await context.resume();
 
     const samples = result.samples();
+    lastRenderedSamples = samples;
+    drawWaveform(samples);
     const audioBuffer = context.createBuffer(1, samples.length, result.sample_rate);
     audioBuffer.copyToChannel(Float32Array.from(samples), 0);
 
@@ -223,6 +289,9 @@ async function playCurrentSelection() {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
     renderStatsEl.textContent = "";
+    if (!lastRenderedSamples.length) {
+      drawWaveform([]);
+    }
   }
 }
 
@@ -256,6 +325,7 @@ async function bootstrap() {
     await init();
     wasmReady = true;
     updateEventPreview();
+    drawWaveform([]);
     modeEl.dispatchEvent(new Event("change"));
     setStatus("Wasm package loaded. Ready to render.");
   } catch (error) {
