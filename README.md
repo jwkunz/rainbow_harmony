@@ -264,6 +264,8 @@ Examples:
 Prerequisites:
 
 - Rust toolchain installed through `rustup`
+- a working default audio output device
+- platform audio development libraries if your OS requires them for native builds
 
 Build and test the entire workspace:
 
@@ -297,8 +299,12 @@ python3 -m http.server 8000
 ```
 
 Then open `http://localhost:8000`.
-- a working default audio output device
-- platform audio development libraries if your OS requires them for native builds
+
+Or use the helper script that rebuilds wasm and starts a local server:
+
+```bash
+./scripts/serve_web.sh
+```
 
 Clone and build:
 
