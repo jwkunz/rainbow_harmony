@@ -40,8 +40,8 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 
 ```bash
 rainbow_harmony (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
-rainbow_harmony --progression '<event => event => event>'
-rainbow_harmony --progression-file <path>
+rainbow_harmony --progression '<event => event => event>' [--progression-mode <mode>] [--gap-ms <ms>] [--legato-ms <ms>]
+rainbow_harmony --progression-file <path> [--progression-mode <mode>] [--gap-ms <ms>] [--legato-ms <ms>]
 ```
 
 Examples:
@@ -161,7 +161,18 @@ Parsing rule:
 - `--progression <text>` plays multiple events separated by `=>`
 - `--progression-file <path>` loads the same progression format from a file
 - omitted settings stay sticky from one event to the next
+- synth settings stay sticky too, not just note and duration settings
 - progressions are a separate mode and cannot be combined with one-event flags at the top level
+- `--progression-mode stitched` pre-renders the whole progression into one buffer for smoother playback
+- `--progression-mode separate` plays each event independently and preserves audible boundaries
+- `--gap-ms <ms>` inserts silence between events
+- `--legato-ms <ms>` overlaps adjacent events at the boundary
+
+Defaults:
+
+- progression mode: `stitched`
+- gap: `0`
+- legato: `0`
 
 Example:
 
@@ -175,6 +186,24 @@ This resolves as:
 - first event: `--chord Cmaj7 --beats 2 --bpm 120`
 - second event: `--chord Cmin --beats 3 --bpm 120`
 - third event: `--chord F7 --beats 3 --bpm 120`
+
+Smoother stitched example with overlap:
+
+```bash
+rainbow_harmony --progression \
+  '--chord Cmaj7 --beats 2 => --chord Fmaj7 => --chord G7 => --chord Cmaj7' \
+  --progression-mode stitched \
+  --legato-ms 8
+```
+
+Separated example with intentional spacing:
+
+```bash
+rainbow_harmony --progression \
+  '--notes C4+E4+G4 --seconds 0.5 => --notes D4+F4+A4 --seconds 0.5' \
+  --progression-mode separate \
+  --gap-ms 50
+```
 
 ## Synthesis Flags
 

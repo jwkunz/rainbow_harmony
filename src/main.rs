@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use rainbow_harmony::audio::play_waveform_blocking;
+use rainbow_harmony::audio::{play_progression_blocking, play_waveform_blocking};
 use rainbow_harmony::cli::{ParseOutcome, parse_args, parse_progression_text, usage};
 
 fn main() -> ExitCode {
@@ -29,22 +29,15 @@ fn run() -> Result<(), String> {
             play_waveform_blocking(&command.chord, command.duration, command.synth_options)
                 .map_err(|error| error.to_string())
         }
-        Ok(ParseOutcome::RunProgression(commands)) => run_progression(commands),
-        Ok(ParseOutcome::RunProgressionFile(path)) => {
+        Ok(ParseOutcome::RunProgression(commands, options)) => {
+            play_progression_blocking(&commands, options).map_err(|error| error.to_string())
+        }
+        Ok(ParseOutcome::RunProgressionFile(path, options)) => {
             let text = fs::read_to_string(&path)
                 .map_err(|error| format!("failed to read progression file `{path}`: {error}"))?;
             let commands = parse_progression_text(&text).map_err(|error| error.to_string())?;
-            run_progression(commands)
+            play_progression_blocking(&commands, options).map_err(|error| error.to_string())
         }
         Err(error) => Err(format!("{error}\n\n{}", usage(&program_name))),
     }
-}
-
-fn run_progression(commands: Vec<rainbow_harmony::cli::CliCommand>) -> Result<(), String> {
-    for command in commands {
-        play_waveform_blocking(&command.chord, command.duration, command.synth_options)
-            .map_err(|error| error.to_string())?;
-    }
-
-    Ok(())
 }

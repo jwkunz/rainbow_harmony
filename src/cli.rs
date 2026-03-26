@@ -14,6 +14,29 @@ pub struct CliCommand {
     pub synth_options: SynthOptions,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgressionMode {
+    Stitched,
+    Separate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProgressionPlaybackOptions {
+    pub mode: ProgressionMode,
+    pub gap_ms: u32,
+    pub legato_ms: u32,
+}
+
+impl Default for ProgressionPlaybackOptions {
+    fn default() -> Self {
+        Self {
+            mode: ProgressionMode::Stitched,
+            gap_ms: 0,
+            legato_ms: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum InputSpec {
     Notes(String),
@@ -54,8 +77,8 @@ struct SynthOptionsPatch {
 #[derive(Debug)]
 pub enum ParseOutcome {
     Run(CliCommand),
-    RunProgression(Vec<CliCommand>),
-    RunProgressionFile(String),
+    RunProgression(Vec<CliCommand>, ProgressionPlaybackOptions),
+    RunProgressionFile(String, ProgressionPlaybackOptions),
     Help,
 }
 
@@ -79,6 +102,9 @@ where
 
     let mut progression = None::<String>;
     let mut progression_file = None::<String>;
+    let mut progression_options = ProgressionPlaybackOptions::default();
+    let mut saw_non_progression_flag = false;
+    let mut saw_progression_option = false;
     let mut index = 0;
     while index < remaining.len() {
         match remaining[index].as_str() {
@@ -89,6 +115,25 @@ where
             "--progression-file" => {
                 let value = raw_flag_value(&remaining, &mut index, "--progression-file")?;
                 progression_file = Some(value.to_string());
+            }
+            "--progression-mode" => {
+                let value = flag_value(&remaining, &mut index, "--progression-mode")?;
+                progression_options.mode = parse_progression_mode(value)?;
+                saw_progression_option = true;
+            }
+            "--gap-ms" => {
+                let value = flag_value(&remaining, &mut index, "--gap-ms")?;
+                progression_options.gap_ms = parse_non_negative_u32(value, "gap")?;
+                saw_progression_option = true;
+            }
+            "--legato-ms" => {
+                let value = flag_value(&remaining, &mut index, "--legato-ms")?;
+                progression_options.legato_ms = parse_non_negative_u32(value, "legato")?;
+                saw_progression_option = true;
+            }
+            "--help" | "-h" => {}
+            flag if flag.starts_with("--") => {
+                saw_non_progression_flag = true;
             }
             _ => {}
         }
@@ -103,22 +148,31 @@ where
             ));
         }
         (Some(text), None) => {
-            if remaining.len() > 2 {
+            if saw_non_progression_flag {
                 return Err(RainbowError::usage(
                     "--progression cannot be combined with other event flags",
                 ));
             }
-            return Ok(ParseOutcome::RunProgression(parse_progression_text(&text)?));
+            return Ok(ParseOutcome::RunProgression(
+                parse_progression_text(&text)?,
+                progression_options,
+            ));
         }
         (None, Some(path)) => {
-            if remaining.len() > 2 {
+            if saw_non_progression_flag {
                 return Err(RainbowError::usage(
                     "--progression-file cannot be combined with other event flags",
                 ));
             }
-            return Ok(ParseOutcome::RunProgressionFile(path));
+            return Ok(ParseOutcome::RunProgressionFile(path, progression_options));
         }
-        (None, None) => {}
+        (None, None) => {
+            if saw_progression_option {
+                return Err(RainbowError::usage(
+                    "--progression-mode, --gap-ms, and --legato-ms require --progression or --progression-file",
+                ));
+            }
+        }
     }
 
     let partial = parse_partial_command_args(&remaining)?;
@@ -519,6 +573,24 @@ fn parse_u64(input: &str, field_name: &str) -> Result<u64, RainbowError> {
     })
 }
 
+fn parse_non_negative_u32(input: &str, field_name: &str) -> Result<u32, RainbowError> {
+    input.parse().map_err(|_| {
+        RainbowError::usage(format!(
+            "invalid {field_name} `{input}`; expected a non-negative integer"
+        ))
+    })
+}
+
+fn parse_progression_mode(input: &str) -> Result<ProgressionMode, RainbowError> {
+    match input {
+        "stitched" => Ok(ProgressionMode::Stitched),
+        "separate" => Ok(ProgressionMode::Separate),
+        _ => Err(RainbowError::usage(format!(
+            "invalid progression mode `{input}`; expected stitched or separate"
+        ))),
+    }
+}
+
 fn flag_value<'a>(
     args: &'a [String],
     index: &mut usize,
@@ -560,8 +632,8 @@ rainbow_harmony plays a note or chord using a flag-based CLI.
 
 Usage:
   {program_name} (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
-  {program_name} --progression '<event => event => event>'
-  {program_name} --progression-file <path>
+  {program_name} --progression '<event => event => event>' [--progression-mode <mode>] [--gap-ms <ms>] [--legato-ms <ms>]
+  {program_name} --progression-file <path> [--progression-mode <mode>] [--gap-ms <ms>] [--legato-ms <ms>]
   {program_name} --help
 
 Required:
@@ -570,6 +642,10 @@ Required:
   --progression <text> Inline progression with => separators and sticky settings
   --progression-file <path>
                        File containing a progression with => separators and sticky settings
+  --progression-mode <mode>
+                       Progression playback mode: stitched or separate, default stitched
+  --gap-ms <ms>        Silence inserted between progression events, default 0
+  --legato-ms <ms>     Boundary overlap between progression events, default 0
 
 Chord Symbols:
   Triads:              C or Cmaj, Cm or Cmin, Caug or C+, Cdim or Co
@@ -609,6 +685,8 @@ Notes:
   - --notes requires octaves on every note segment
   - --chord accepts chord symbols such as Cm7, Cadd9, C7#5, or C/E
   - In progressions, => separates events and omitted settings stay sticky
+  - stitched pre-renders the full progression into one buffer for smoother playback
+  - separate plays each event individually and preserves audible boundaries
   - Octaves must be between 0 and 8
 "
     )
@@ -618,7 +696,10 @@ Notes:
 mod tests {
     use std::time::Duration;
 
-    use super::{DEFAULT_SECONDS, ParseOutcome, SynthOptions, parse_args};
+    use super::{
+        DEFAULT_SECONDS, ParseOutcome, ProgressionMode, ProgressionPlaybackOptions, SynthOptions,
+        parse_args,
+    };
 
     #[test]
     fn parses_valid_beat_arguments() {
@@ -735,7 +816,7 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::RunProgression(commands) = outcome else {
+        let ParseOutcome::RunProgression(commands, options) = outcome else {
             panic!("expected progression outcome");
         };
 
@@ -743,6 +824,7 @@ mod tests {
         assert_eq!(commands[0].duration, Duration::from_secs_f64(1.0));
         assert_eq!(commands[1].duration, Duration::from_secs_f64(1.5));
         assert_eq!(commands[1].synth_options, SynthOptions::default());
+        assert_eq!(options, ProgressionPlaybackOptions::default());
     }
 
     #[test]
@@ -754,13 +836,42 @@ mod tests {
         ])
         .unwrap();
 
-        let ParseOutcome::RunProgression(commands) = outcome else {
+        let ParseOutcome::RunProgression(commands, _) = outcome else {
             panic!("expected progression outcome");
         };
 
         assert_eq!(commands.len(), 2);
         assert_eq!(commands[0].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
         assert_eq!(commands[1].duration, Duration::from_secs_f64(DEFAULT_SECONDS));
+    }
+
+    #[test]
+    fn parses_progression_playback_options() {
+        let outcome = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--progression".to_string(),
+            "--chord Cmaj7 => --chord F7".to_string(),
+            "--progression-mode".to_string(),
+            "separate".to_string(),
+            "--gap-ms".to_string(),
+            "25".to_string(),
+            "--legato-ms".to_string(),
+            "5".to_string(),
+        ])
+        .unwrap();
+
+        let ParseOutcome::RunProgression(_, options) = outcome else {
+            panic!("expected progression outcome");
+        };
+
+        assert_eq!(
+            options,
+            ProgressionPlaybackOptions {
+                mode: ProgressionMode::Separate,
+                gap_ms: 25,
+                legato_ms: 5,
+            }
+        );
     }
 
     #[test]
@@ -841,6 +952,21 @@ mod tests {
         .to_string();
 
         assert!(error.contains("--progression cannot be combined"));
+    }
+
+    #[test]
+    fn rejects_progression_options_without_progression() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--gap-ms".to_string(),
+            "10".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("require --progression or --progression-file"));
     }
 
     #[test]
