@@ -28,6 +28,7 @@ where
     let _program = args.next().unwrap_or_else(|| "rainbow_harmony".to_string());
     let remaining: Vec<String> = args.collect();
     let mut notes = None::<String>;
+    let mut chord_name = None::<String>;
     let mut beats = None::<u32>;
     let mut bpm = DEFAULT_BPM;
     let mut seconds = None::<f64>;
@@ -54,6 +55,10 @@ where
             "--notes" => {
                 let value = flag_value(&remaining, &mut index, "--notes")?;
                 notes = Some(value.to_string());
+            }
+            "--chord" => {
+                let value = flag_value(&remaining, &mut index, "--chord")?;
+                chord_name = Some(value.to_string());
             }
             "--beats" => {
                 let value = flag_value(&remaining, &mut index, "--beats")?;
@@ -131,8 +136,20 @@ where
         index += 1;
     }
 
-    let notes = notes.ok_or_else(|| RainbowError::usage("missing required flag --notes"))?;
-    let chord = Chord::parse(&notes)?;
+    let chord = match (notes, chord_name) {
+        (Some(notes), None) => Chord::parse_notes(&notes)?,
+        (None, Some(chord_name)) => Chord::parse_symbol_name(&chord_name)?,
+        (Some(_), Some(_)) => {
+            return Err(RainbowError::usage(
+                "use exactly one of --notes or --chord",
+            ));
+        }
+        (None, None) => {
+            return Err(RainbowError::usage(
+                "missing required input; use exactly one of --notes or --chord",
+            ));
+        }
+    };
 
     let duration = match (beats, seconds) {
         (Some(beats), None) => Duration::from_secs_f64(beats as f64 * 60.0 / bpm as f64),
@@ -287,11 +304,20 @@ pub fn usage(program_name: &str) -> String {
 rainbow_harmony plays a note or chord using a flag-based CLI.
 
 Usage:
-  {program_name} --notes <notes> (--beats <beats> [--bpm <bpm>] | --seconds <seconds>) [options]
+  {program_name} (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
   {program_name} --help
 
 Required:
-  --notes <notes>      Note or chord expression such as A4, Bb3, or C4+E4+G4
+  --notes <notes>      Explicit note list such as A4 or C4+E4+G4
+  --chord <symbol>     Chord symbol such as Cmaj7, Cm7b5, or C/E
+
+Chord Symbols:
+  Triads:              major, minor, augmented, diminished
+  Extensions:          6, 7, maj7, 9, 11, 13
+  Added tones:         add2, add4, add9
+  Suspensions:         sus2, sus4, sus
+  Alterations:         b5, #5, b9, #9, #11, b13
+  Bass notation:       slash chords such as C/E
 
 Duration:
   --beats <beats>      Positive integer beat count
@@ -315,11 +341,13 @@ Notes:
   - This CLI no longer accepts positional arguments
   - If neither --beats nor --seconds is provided, playback defaults to 2.0 seconds
   - Do not use --beats and --seconds together
+  - Use exactly one of --notes or --chord
   - --bpm may only be used with --beats
   - Note letters A through G are accepted in either case
   - Sharps use # and flats use b, for example C#4 or Bb3
+  - --notes requires octaves on every note segment
+  - --chord accepts chord symbols such as Cm7, Cadd9, C7#5, or C/E
   - Octaves must be between 0 and 8
-  - Chord notes are joined with +
 "
     )
 }
@@ -390,8 +418,8 @@ mod tests {
     fn parses_synthesis_flags() {
         let outcome = parse_args(vec![
             "rainbow_harmony".to_string(),
-            "--notes".to_string(),
-            "A4".to_string(),
+            "--chord".to_string(),
+            "A".to_string(),
             "--seconds".to_string(),
             "1.5".to_string(),
             "--gain".to_string(),
@@ -484,6 +512,34 @@ mod tests {
         .to_string();
 
         assert!(error.contains("--bpm may only be used together with --beats"));
+    }
+
+    #[test]
+    fn rejects_using_notes_and_chord_together() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--notes".to_string(),
+            "A4".to_string(),
+            "--chord".to_string(),
+            "Cmaj7".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("exactly one of --notes or --chord"));
+    }
+
+    #[test]
+    fn rejects_missing_notes_or_chord() {
+        let error = parse_args(vec![
+            "rainbow_harmony".to_string(),
+            "--seconds".to_string(),
+            "1.0".to_string(),
+        ])
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("exactly one of --notes or --chord"));
     }
 
     #[test]

@@ -101,6 +101,39 @@ impl Note {
 
         440.0_f32 * 2.0_f32.powf(semitones_from_a4 as f32 / 12.0)
     }
+
+    pub fn from_midi_note(midi_note: i32) -> Result<Self, RainbowError> {
+        let octave = (midi_note / 12) - 1;
+        if !(i32::from(MIN_OCTAVE)..=i32::from(MAX_OCTAVE)).contains(&octave) {
+            return Err(RainbowError::usage(format!(
+                "generated note out of supported octave range; expected {} through {}",
+                MIN_OCTAVE, MAX_OCTAVE
+            )));
+        }
+
+        let pitch_class = midi_note.rem_euclid(12);
+        let (letter, accidental) = match pitch_class {
+            0 => ('C', Accidental::Natural),
+            1 => ('C', Accidental::Sharp),
+            2 => ('D', Accidental::Natural),
+            3 => ('D', Accidental::Sharp),
+            4 => ('E', Accidental::Natural),
+            5 => ('F', Accidental::Natural),
+            6 => ('F', Accidental::Sharp),
+            7 => ('G', Accidental::Natural),
+            8 => ('G', Accidental::Sharp),
+            9 => ('A', Accidental::Natural),
+            10 => ('A', Accidental::Sharp),
+            11 => ('B', Accidental::Natural),
+            _ => unreachable!("pitch class is modulo 12"),
+        };
+
+        Ok(Self {
+            letter,
+            accidental,
+            octave: octave as u8,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -149,5 +182,11 @@ mod tests {
     fn rejects_out_of_range_octave() {
         let error = Note::parse("A9").unwrap_err().to_string();
         assert!(error.contains("octave out of range"));
+    }
+
+    #[test]
+    fn builds_note_from_midi() {
+        let note = Note::from_midi_note(60).unwrap();
+        assert_frequency_close(note.frequency_hz(), 261.62558);
     }
 }

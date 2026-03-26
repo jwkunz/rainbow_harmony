@@ -4,7 +4,8 @@
 
 You give it:
 
-- a note or chord expression such as `A4` or `C4+E4+G4` via `--notes`
+- either explicit notes such as `A4` or `C4+E4+G4` via `--notes`
+- or a chord symbol such as `Cmaj7` or `C/E` via `--chord`
 - either a duration in beats via `--beats` with optional `--bpm`
 - or an absolute duration via `--seconds`
 - optional synthesis controls such as `--gain`, `--harmonics`, phase modulation, vibrato, tremolo, white noise, and `--seed`
@@ -38,7 +39,7 @@ The project currently targets local builds. GitHub release packaging for macOS, 
 ## Command Syntax
 
 ```bash
-rainbow_harmony --notes <notes> [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
+rainbow_harmony (--notes <notes> | --chord <symbol>) [--beats <beats> [--bpm <bpm>] | --seconds <seconds>] [options]
 ```
 
 Examples:
@@ -48,6 +49,9 @@ rainbow_harmony --notes A4 --beats 2
 rainbow_harmony --notes c4 --beats 2
 rainbow_harmony --notes Bb3 --beats 4
 rainbow_harmony --notes C4+E4+G4 --beats 2
+rainbow_harmony --chord Cmaj7 --beats 2
+rainbow_harmony --chord Cm7b5 --beats 2
+rainbow_harmony --chord C/E --beats 2
 rainbow_harmony --notes A3+C#4+E4 --beats 4 --bpm 90
 rainbow_harmony --notes A4 --seconds 1.5
 rainbow_harmony --notes A4
@@ -100,9 +104,12 @@ Invalid examples:
 
 ## Chords
 
-Join notes with `+` to play them simultaneously.
+`rainbow_harmony` supports two chord input modes:
 
-Examples:
+- explicit note lists via `--notes`
+- chord symbols via `--chord`
+
+Explicit-note examples:
 
 ```bash
 rainbow_harmony --notes C4+E4 --beats 2
@@ -112,9 +119,35 @@ rainbow_harmony --notes C4+C4 --beats 1
 
 Duplicate notes are allowed.
 
+Chord-symbol examples:
+
+```bash
+rainbow_harmony --chord C --beats 2
+rainbow_harmony --chord Cm7 --beats 2
+rainbow_harmony --chord Cmaj7 --beats 2
+rainbow_harmony --chord C7#5 --beats 2
+rainbow_harmony --chord Cadd9 --beats 2
+rainbow_harmony --chord Csus4 --beats 2
+rainbow_harmony --chord C/E --beats 2
+```
+
+Supported chord-symbol families currently include:
+
+- major, minor, augmented, and diminished triads
+- `6`, `7`, `maj7`, `9`, `11`, and `13`
+- `add2`, `add4`, and `add9`
+- `sus2`, `sus4`, and `sus`
+- alterations `b5`, `#5`, `b9`, `#9`, `#11`, and `b13`
+- slash chords such as `C/E`
+
+Parsing rule:
+
+- `--notes` expects explicit note-list syntax and every segment must include an octave
+- `--chord` expects a chord symbol
+
 ## Duration
 
-- `--notes` is required
+- use exactly one of `--notes` or `--chord`
 - use at most one of `--beats` or `--seconds`
 - `--beats` must be a positive integer
 - `--seconds` must be a positive number and defaults to `2.0` when omitted
