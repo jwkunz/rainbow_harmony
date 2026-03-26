@@ -312,7 +312,7 @@ Required:
   --chord <symbol>     Chord symbol such as Cmaj7, Cm7b5, or C/E
 
 Chord Symbols:
-  Triads:              major, minor, augmented, diminished
+  Triads:              C or Cmaj, Cm or Cmin, Caug or C+, Cdim or Co
   Extensions:          6, 7, maj7, 9, 11, 13
   Added tones:         add2, add4, add9
   Suspensions:         sus2, sus4, sus

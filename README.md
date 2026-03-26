@@ -133,7 +133,7 @@ rainbow_harmony --chord C/E --beats 2
 
 Supported chord-symbol families currently include:
 
-- major, minor, augmented, and diminished triads
+- triads spelled as `C` or `Cmaj`, `Cm` or `Cmin`, `Caug` or `C+`, and `Cdim` or `Co`
 - `6`, `7`, `maj7`, `9`, `11`, and `13`
 - `add2`, `add4`, and `add9`
 - `sus2`, `sus4`, and `sus`
