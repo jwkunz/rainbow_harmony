@@ -2,6 +2,13 @@
 name = "rainbow_harmony_core"
 version = "0.1.0"
 edition = "2024"
+description = "Note and chord parsing, progressions, and additive synthesis for the rainbow_harmony synthesizer"
+license = "MIT"
+repository = "https://github.com/jwkunz/rainbow_harmony"
+readme = "../../README.md"
+rust-version = "1.85"
+keywords = ["music", "chord", "synthesizer", "audio", "dsp"]
+categories = ["multimedia::audio"]
 
 [lib]
 name = "rainbow_harmony_core"

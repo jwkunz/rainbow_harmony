@@ -2,7 +2,14 @@
 name = "rainbow_harmony"
 version = "0.1.0"
 edition = "2024"
+description = "A command-line musical synthesizer that plays notes, chords, and progressions through your audio output"
+license = "MIT"
+repository = "https://github.com/jwkunz/rainbow_harmony"
+readme = "../../README.md"
+rust-version = "1.85"
+keywords = ["music", "chord", "synthesizer", "audio", "cli"]
+categories = ["multimedia::audio", "command-line-utilities"]
 
 [dependencies]
 cpal = "0.16"
-rainbow_harmony_core = { path = "../core" }
+rainbow_harmony_core = { version = "0.1.0", path = "../core" }
