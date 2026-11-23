@@ -1,6 +1,6 @@
 [package]
 name = "rainbow_harmony_core"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "Note and chord parsing, progressions, and additive synthesis for the rainbow_harmony synthesizer"
 license = "MIT"

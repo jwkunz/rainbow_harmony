@@ -1,6 +1,6 @@
 [package]
 name = "rainbow_harmony"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "A command-line musical synthesizer that plays notes, chords, and progressions through your audio output"
 license = "MIT"
@@ -12,4 +12,4 @@ categories = ["multimedia::audio", "command-line-utilities"]
 
 [dependencies]
 cpal = "0.16"
-rainbow_harmony_core = { version = "0.1.0", path = "../core" }
+rainbow_harmony_core = { version = "1.0.0", path = "../core" }

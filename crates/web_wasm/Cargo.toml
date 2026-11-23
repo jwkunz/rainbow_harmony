@@ -1,6 +1,6 @@
 [package]
 name = "rainbow_harmony_web_wasm"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 
 [lib]
@@ -9,5 +9,5 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rainbow_harmony_core = { path = "../core" }
+rainbow_harmony_core = { version = "1.0.0", path = "../core" }
 wasm-bindgen = "0.2"

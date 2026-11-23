@@ -21,7 +21,7 @@ The repository is organized as a Cargo workspace:
 
 ## Status
 
-The project currently targets local builds. GitHub release packaging for macOS, Linux, and Windows is planned for a later step.
+Version 1.0.0. The CLI and core library are published on [crates.io](https://crates.io/crates/rainbow_harmony), and can be installed with `cargo install rainbow_harmony`. Prebuilt binaries for macOS, Linux, and Windows are planned for a later step.
 
 ## Features
 
@@ -262,6 +262,14 @@ Examples:
 - `1` beat at `90` BPM = `0.666...` seconds
 
 ## Installation
+
+### From crates.io
+
+```bash
+cargo install rainbow_harmony
+```
+
+On Linux you may need the ALSA development headers first (see Linux Notes below).
 
 ### From Source
 

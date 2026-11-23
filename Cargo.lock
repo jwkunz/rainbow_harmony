@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "rainbow_harmony"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cpal",
  "rainbow_harmony_core",
@@ -457,11 +457,11 @@ dependencies = [
 
 [[package]]
 name = "rainbow_harmony_core"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "rainbow_harmony_web_wasm"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "rainbow_harmony_core",
  "wasm-bindgen",
